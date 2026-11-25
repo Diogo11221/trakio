@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
@@ -8,6 +9,8 @@ import { MuscleMap, type MuscleTag } from '@/components/MuscleMap';
 import { Reveal, Screen } from '@/components/Screen';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { Card, CardRow, SectionLabel } from '@/components/Surface';
+import { ToolGrid } from '@/features/tools/components';
+import { clientBody } from '@/features/tools/data';
 import { refreshMockData } from '@/lib/refresh';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -84,6 +87,13 @@ export default function Progress() {
             </CardRow>
           ))}
         </Card>
+      </Reveal>
+
+      <Reveal index={4}>
+        <SectionLabel>Ferramentas</SectionLabel>
+      </Reveal>
+      <Reveal index={5}>
+        <ToolGrid body={clientBody} onOpen={(id) => router.push({ pathname: '/tools/[id]', params: { id } })} />
       </Reveal>
     </Screen>
   );

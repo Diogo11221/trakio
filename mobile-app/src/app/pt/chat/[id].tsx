@@ -13,14 +13,10 @@ import { IconButton } from '@/components/Surface';
 import { AttachSheet, type Attachment } from '@/features/pt/AttachSheet';
 import type { ChatMessage } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
+import { formatTimeOfDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { enterRise } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
-
-function nowTime(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
 
 /** PT · Mensagens · conversa (+ anexar). */
 export default function Chat() {
@@ -48,11 +44,11 @@ export default function Chat() {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
-    send({ id: `m-${Date.now()}`, from: 'me', kind: 'text', text, time: nowTime() });
+    send({ id: `m-${Date.now()}`, from: 'me', kind: 'text', text, time: formatTimeOfDay(new Date()) });
   };
 
   const sendAttachment = (attachment: Attachment) => {
-    const base = { id: `m-${Date.now()}`, time: nowTime() };
+    const base = { id: `m-${Date.now()}`, time: formatTimeOfDay(new Date()) };
     if (attachment.kind === 'photo') send({ ...base, from: 'me', kind: 'photo', uri: attachment.uri });
     else if (attachment.kind === 'file') send({ ...base, from: 'me', kind: 'file', name: attachment.name, meta: attachment.meta });
     else send({ ...base, from: 'system', kind: 'workout', title: attachment.title, detail: attachment.detail });

@@ -123,6 +123,31 @@ export default function TrainerHome() {
             ))}
           </Card>
         </Reveal>
+
+        <Reveal index={6}>
+          <SectionHeader title="Ferramentas" />
+        </Reveal>
+        <Reveal index={7}>
+          <PressableScale
+            onPress={() => router.push('/pt/tools')}
+            haptic="tap"
+            pressedScale={0.98}
+            accessibilityRole="button"
+            accessibilityLabel="Calculadoras"
+          >
+            <Card>
+              <CardRow last style={styles.toolsRow}>
+                <View style={styles.flex}>
+                  <AppText variant="label">Calculadoras</AppText>
+                  <AppText variant="caption" tone="muted">
+                    Massa corporal, calorias, peso máximo, gordura, água e discos — com as medidas de cada aluno
+                  </AppText>
+                </View>
+                <Icon name="chevronRightFaint" size={14} />
+              </CardRow>
+            </Card>
+          </PressableScale>
+        </Reveal>
       </Screen>
       <AccountSheet visible={accountOpen} onClose={() => setAccountOpen(false)} />
     </>
@@ -136,6 +161,7 @@ const styles = StyleSheet.create({
   row: { paddingHorizontal: 14, paddingVertical: 12 },
   name: { fontFamily: fonts.uiSemiBold, fontSize: 14, color: colors.text },
   empty: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16 },
+  toolsRow: { paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
   agendaRow: { paddingHorizontal: 14, paddingVertical: 12, gap: 14 },
   time: { width: 46, fontFamily: fonts.monoMedium, fontSize: 14, color: colors.text },
   join: { backgroundColor: colors.volt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },

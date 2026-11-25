@@ -19,6 +19,8 @@ export default function TrainerLayout() {
         <Stack.Screen name="plan/[id]" />
         <Stack.Screen name="chat/[id]" />
         <Stack.Screen name="verify" />
+        <Stack.Screen name="tools/index" />
+        <Stack.Screen name="tools/[id]" />
       </Stack>
     </TrainerProvider>
   );
