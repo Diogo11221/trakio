@@ -64,6 +64,10 @@ function PinnedShowcase() {
     let pointer = { x: 0, y: 0 };
     let smoothPointer = { x: 0, y: 0 };
     let frame = 0;
+    let visible = true;
+    let lastTransform = '';
+    let lastOrigin = '';
+    let measuredFor = '';
 
     const measure = (): Layout | null => {
       const stickyEl = sticky.current;
@@ -154,18 +158,39 @@ function PinnedShowcase() {
         const rx = mix(24, 8, e) - py * mix(3, 2.5, e);
         const ry = mix(0, -34 + (s / COUNT) * 12, e) + px * mix(6, 4, e);
         const rz = mix(0, 7, e);
-        rig.current.style.transform =
-          `translate3d(${(cx - RIG_W / 2).toFixed(2)}px, ${(cy - RIG_H / 2).toFixed(2)}px, 0) ` +
-          `rotateX(${rx.toFixed(3)}deg) rotateY(${ry.toFixed(3)}deg) rotateZ(${rz.toFixed(3)}deg) scale(${scale.toFixed(4)})`;
-        world.current.style.perspectiveOrigin = `${mix(layout.vw / 2, cx, e).toFixed(1)}px ${mix(layout.vh * 0.45, cy, e).toFixed(1)}px`;
+        const transform =
+          `translate3d(${(cx - RIG_W / 2).toFixed(1)}px, ${(cy - RIG_H / 2).toFixed(1)}px, 0) ` +
+          `rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) rotateZ(${rz.toFixed(2)}deg) scale(${scale.toFixed(4)})`;
+        const origin = `${mix(layout.vw / 2, cx, e).toFixed(0)}px ${mix(layout.vh * 0.45, cy, e).toFixed(0)}px`;
+        // Only touch the DOM when something actually moved.
+        if (transform !== lastTransform) {
+          rig.current.style.transform = transform;
+          lastTransform = transform;
+        }
+        if (origin !== lastOrigin) {
+          world.current.style.perspectiveOrigin = origin;
+          lastOrigin = origin;
+        }
       }
-      frame = requestAnimationFrame(renderRig);
+      frame = visible ? requestAnimationFrame(renderRig) : 0;
     };
+
+    // Stop the loop entirely once the showcase is off screen.
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = Boolean(entry?.isIntersecting);
+      if (visible && !frame) frame = requestAnimationFrame(renderRig);
+    });
+    if (section.current) observer.observe(section.current);
 
     const unsubscribe = subscribeScroll((_, viewportH) => {
       const element = section.current;
       if (!element) return;
-      layout = measure();
+      // Measuring forces a layout; only do it when the viewport size changes.
+      const size = `${window.innerWidth}x${viewportH}`;
+      if (size !== measuredFor || !layout) {
+        layout = measure();
+        measuredFor = size;
+      }
       const u = -element.getBoundingClientRect().top / viewportH;
       intro = clamp01(u / INTRO);
       s = clamp01((u - INTRO) / (COUNT * STAGE)) * COUNT;
@@ -179,6 +204,7 @@ function PinnedShowcase() {
 
     return () => {
       cancelAnimationFrame(frame);
+      observer.disconnect();
       window.removeEventListener('pointermove', onMove);
       unsubscribe();
     };
