@@ -102,6 +102,19 @@
 .mobilePhoneTilt {
   transform-origin: 50% 0;
   transform: rotateX(14deg) scale(0.82);
+  animation: float 7s var(--ease-in-out) 1.8s infinite alternate;
+}
+/* Slow idle float so the hero isn't static before the first scroll. */
+@keyframes float {
+  0% {
+    transform: translateY(0) rotateX(14deg) rotateY(-3deg) rotateZ(-0.6deg) scale(0.82);
+  }
+  50% {
+    transform: translateY(-8px) rotateX(12deg) rotateY(1deg) rotateZ(0.4deg) scale(0.82);
+  }
+  100% {
+    transform: translateY(-2px) rotateX(15deg) rotateY(3deg) rotateZ(0.8deg) scale(0.82);
+  }
 }
 
 @keyframes rise {
