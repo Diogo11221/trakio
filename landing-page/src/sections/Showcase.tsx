@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AppViewport, Phone } from '../components/Phone';
+import { Texture } from '../components/Texture';
 import { subscribeScroll } from '../hooks/scrollBus';
 import { useMediaQuery, usePrefersReducedMotion } from '../hooks/useMediaQuery';
 import { HeroCopy, MobileHero } from './Hero';
@@ -51,6 +52,7 @@ function PinnedShowcase() {
   const rig = useRef<HTMLDivElement>(null);
   const dim = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
+  const dial = useRef<HTMLDivElement>(null);
   const railFill = useRef<HTMLSpanElement>(null);
   const copies = useRef<Array<HTMLDivElement | null>>([]);
   const screens = useRef<Array<HTMLDivElement | null>>([]);
@@ -79,13 +81,20 @@ function PinnedShowcase() {
       const slotRect = slotEl.getBoundingClientRect();
       // Phone sits just below the hero copy (offsets ignore the copy's own transforms).
       const phoneTop = copyEl.offsetTop + copyEl.offsetHeight + 44;
+      const storyCx = slotRect.left - stickyRect.left + slotRect.width / 2;
+      const storyCy = navH + (vh - navH) / 2;
+      if (dial.current) {
+        dial.current.style.left = `${storyCx.toFixed(1)}px`;
+        dial.current.style.top = `${storyCy.toFixed(1)}px`;
+        dial.current.style.setProperty('--dial-scale', storyScale.toFixed(4));
+      }
       return {
         vw,
         vh,
         heroCx: vw / 2 - (PHONE_X + PHONE_W / 2 - RIG_W / 2),
         heroCy: phoneTop - PHONE_Y + RIG_H / 2,
-        storyCx: slotRect.left - stickyRect.left + slotRect.width / 2,
-        storyCy: navH + (vh - navH) / 2,
+        storyCx,
+        storyCy,
         storyScale,
       };
     };
@@ -131,7 +140,12 @@ function PinnedShowcase() {
         }
       });
       if (dim.current) dim.current.style.opacity = (dimAmount * 0.66).toFixed(3);
-      if (rail.current) rail.current.style.opacity = smooth((intro - 0.7) / 0.3).toFixed(3);
+      const storyIn = smooth((intro - 0.7) / 0.3);
+      if (rail.current) rail.current.style.opacity = storyIn.toFixed(3);
+      if (dial.current) {
+        dial.current.style.opacity = storyIn.toFixed(3);
+        dial.current.style.setProperty('--dial-turn', `${(s * 40).toFixed(2)}deg`);
+      }
       if (railFill.current) railFill.current.style.transform = `scaleY(${(s / COUNT).toFixed(4)})`;
     };
 
@@ -198,7 +212,13 @@ function PinnedShowcase() {
       ))}
 
       <div ref={sticky} className={styles.sticky}>
-        <div ref={heroBg} className={styles.heroBg} aria-hidden="true" />
+        <div ref={heroBg} className={styles.heroBg} aria-hidden="true">
+          <Texture variant="ruling" />
+        </div>
+        {/* Rest-timer style dial behind the phone in the story; follows the rig's landing spot. */}
+        <div ref={dial} className={styles.dial} aria-hidden="true">
+          <Texture variant="dial" />
+        </div>
 
         <div ref={heroLayer} className={styles.heroLayer}>
           <HeroCopy ref={heroCopy} />

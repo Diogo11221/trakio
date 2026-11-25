@@ -3,6 +3,7 @@
   background: var(--color-bg);
 }
 .frame {
+  position: relative;
   max-width: var(--page-max);
   margin: 0 auto;
   padding: calc(var(--nav-height) + 58px) var(--page-gutter) 120px;

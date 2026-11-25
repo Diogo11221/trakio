@@ -87,6 +87,7 @@
   background: linear-gradient(180deg, rgba(11, 12, 14, 0), var(--color-bg));
 }
 .mobilePhone {
+  position: relative;
   /* Shows the top ~300px of the phone, below the copy — never on top of it. */
   height: 300px;
   margin-top: 40px;

@@ -1,6 +1,7 @@
 import type { CSSProperties, Ref } from 'react';
 import { ArrowLink, PrimaryButton } from '../components/Buttons';
 import { AppViewport, Phone } from '../components/Phone';
+import { Texture } from '../components/Texture';
 import { TrainScreen } from '../screens/TrainScreen';
 import styles from './Hero.module.css';
 
@@ -41,6 +42,7 @@ export function HeroCopy({ ref }: { ref?: Ref<HTMLDivElement> }) {
 export function MobileHero() {
   return (
     <section id="topo" className={styles.mobileHero} aria-labelledby="hero-title">
+      <Texture variant="ruling" />
       <HeroCopy />
       <div className={styles.mobilePhone}>
         <div className={styles.phoneEntrance}>

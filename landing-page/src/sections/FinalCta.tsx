@@ -2,6 +2,7 @@ import { useRef, type CSSProperties } from 'react';
 import iconAndroid from '../assets/figma/icon-android.svg';
 import iconApple from '../assets/figma/icon-apple.svg';
 import logoLarge from '../assets/figma/logo-ring-large.svg';
+import { Texture } from '../components/Texture';
 import { useRevealChildren } from '../hooks/useInView';
 import { useScrollProgress } from '../hooks/useScrollProgress';
 import styles from './FinalCta.module.css';
@@ -21,6 +22,7 @@ export function FinalCta() {
 
   return (
     <section ref={section} id="comecar" className={styles.section} aria-labelledby="cta-title">
+      <Texture variant="ripple" />
       <div className={styles.logoStage} data-reveal>
         <img ref={logo} src={logoLarge} alt="" width={56} height={56} />
       </div>

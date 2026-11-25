@@ -1,5 +1,6 @@
 import { useRef, type CSSProperties } from 'react';
 import { FitScale } from '../components/FitScale';
+import { Texture } from '../components/Texture';
 import { useRevealChildren } from '../hooks/useInView';
 import { useScrollProgress } from '../hooks/useScrollProgress';
 import { PtDashboard } from '../screens/PtDashboard';
@@ -27,6 +28,7 @@ export function ForTrainers() {
 
   return (
     <section ref={section} id="para-pts" className={styles.section} aria-labelledby="para-pts-title">
+      <Texture variant="dots" />
       <div className={styles.frame}>
         <div className={styles.copy}>
           <p className={styles.kicker} data-reveal>

@@ -1,6 +1,7 @@
 import { useRef, type CSSProperties } from 'react';
 import iconNo from '../assets/figma/icon-no.svg';
 import iconYes from '../assets/figma/icon-yes.svg';
+import { Texture } from '../components/Texture';
 import { useRevealChildren } from '../hooks/useInView';
 import styles from './Pricing.module.css';
 
@@ -32,6 +33,7 @@ export function Pricing() {
 
   return (
     <section ref={section} id="precos" className={styles.section} aria-labelledby="precos-title">
+      <Texture variant="knurl" />
       <div className={styles.frame}>
         <header className={styles.header} data-reveal>
           <h2 id="precos-title">Preços simples</h2>

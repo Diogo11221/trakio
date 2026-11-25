@@ -1,9 +1,14 @@
 .section {
+  position: relative;
   max-width: var(--page-max);
   margin: 0 auto;
   padding: 120px var(--page-gutter) 100px;
   display: flex;
   gap: 80px;
+}
+.intro,
+.accordion {
+  position: relative;
 }
 .intro {
   width: 420px;
