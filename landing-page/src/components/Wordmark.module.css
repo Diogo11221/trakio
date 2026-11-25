@@ -1,0 +1,19 @@
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+  color: var(--color-text);
+  line-height: 1;
+}
+.wordmark img {
+  width: 24px;
+  height: 24px;
+  transition: transform 0.8s var(--ease-out);
+}
+.wordmark:hover img {
+  transform: rotate(-120deg);
+}

@@ -1,0 +1,52 @@
+.stepIndex {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.stepIndex > span:first-child {
+  font-size: 12px;
+  color: var(--color-volt);
+}
+.ticks {
+  display: flex;
+  gap: 6px;
+}
+.ticks span {
+  width: 32px;
+  height: 2px;
+  background: var(--color-border-strong);
+}
+.ticks span[data-active='true'] {
+  background: var(--color-volt);
+}
+.stepLabel {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--color-text-muted);
+}
+
+.detailList {
+  width: min(460px, 100%);
+  border-top: 1px solid var(--color-border);
+}
+.detailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 44px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.value,
+.valueVolt {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.valueVolt {
+  color: var(--color-volt);
+}

@@ -1,0 +1,110 @@
+.phone {
+  position: relative;
+  width: 360px;
+  height: 740px;
+  transform-style: preserve-3d;
+}
+
+/* Side buttons — tiny titanium bars. */
+.button {
+  position: absolute;
+  width: 5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #1b1d21, #4a4e57);
+}
+.action {
+  left: -3px;
+  top: 150px;
+  height: 30px;
+}
+.volUp {
+  left: -3px;
+  top: 206px;
+  height: 58px;
+}
+.volDown {
+  left: -3px;
+  top: 276px;
+  height: 58px;
+}
+.power {
+  left: 358px;
+  top: 236px;
+  height: 92px;
+  background: linear-gradient(270deg, #1b1d21, #4a4e57);
+}
+
+/* Frame · Titanium: banded gradient + a fine brushed-metal texture. */
+.frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: 4px;
+  border-radius: 62px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.035) 0 1px,
+      rgba(0, 0, 0, 0.04) 1px 2px,
+      transparent 2px 3px
+    ),
+    linear-gradient(
+      110.05deg,
+      rgb(90, 94, 102) 14.286%,
+      rgb(36, 38, 43) 27.143%,
+      rgb(59, 62, 69) 47.143%,
+      rgb(23, 24, 27) 65.714%,
+      rgb(69, 72, 79) 85.714%
+    );
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.5),
+    0 70px 120px rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+}
+
+.bezel {
+  flex: 1;
+  display: flex;
+  padding: 11px;
+  border-radius: 58px;
+  background: #030304;
+  overflow: hidden;
+}
+
+.screen {
+  position: relative;
+  flex: 1;
+  border-radius: 47px;
+  background: var(--color-bg);
+  overflow: hidden;
+  /* Safari: keep the rounded clip while children are transformed. */
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+/* Soft glass reflection across the screen. */
+.glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 28%,
+    transparent 42%
+  );
+  mix-blend-mode: screen;
+}
+
+.viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 390px;
+  height: 844px;
+  transform: scale(0.84615);
+  transform-origin: 0 0;
+  background: var(--color-bg);
+  overflow: hidden;
+}

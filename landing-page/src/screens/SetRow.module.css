@@ -1,0 +1,78 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 350px;
+  height: 48px;
+  padding: 0 8px 0 12px;
+  border-radius: 12px;
+}
+.set {
+  width: 28px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+.prev {
+  width: 86px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.kg,
+.reps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-soft);
+}
+.kg {
+  flex: 1;
+}
+.reps {
+  width: 56px;
+}
+.check {
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.check img {
+  width: 16px;
+  height: 16px;
+}
+
+.active,
+.placeholder {
+  height: 60px;
+}
+.active {
+  background: var(--color-surface);
+  border: 1px solid rgba(212, 255, 0, 0.35);
+}
+.active .set {
+  color: var(--color-volt);
+}
+.input {
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-input);
+  border: 1px solid var(--color-border-strong);
+  font-size: 17px;
+  color: var(--color-text);
+}
+.checkEmpty {
+  border: 1.5px solid rgba(212, 255, 0, 0.8);
+}
+
+/* Placeholder left behind in the screen while the real row pops out in 3D. */
+.placeholder {
+  border: 1px dashed rgba(142, 149, 162, 0.35);
+}
+.placeholder > * {
+  opacity: 0;
+}
