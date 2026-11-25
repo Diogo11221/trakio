@@ -1,0 +1,262 @@
+/* Layout pieces shared by the admin pages. */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 24px;
+}
+.kpi + .kpi {
+  border-left: 1px solid var(--color-border);
+}
+.kpiLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.kpiValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.kpiValue {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.kpiUnit {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+.kpiNote {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.delta {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--color-volt);
+  font-size: 11px;
+  font-weight: 600;
+}
+.deltaNeutral {
+  background: var(--color-bg);
+}
+
+/* Master–detail (Verificação, Denúncias) */
+.split {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  min-height: 300px;
+}
+.queueItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  text-align: left;
+  transition:
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out);
+}
+.queueItem:hover {
+  background: var(--color-bg);
+}
+.queueItemActive,
+.queueItemActive:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+.queueText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.queueTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.queueTitle {
+  font-weight: 600;
+  font-size: 14px;
+}
+.queueMeta {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.queueSub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.queueStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px;
+  min-height: 690px;
+  animation: detailIn 240ms var(--ease-out);
+}
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.detailName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+.muted {
+  color: var(--color-text-muted);
+}
+.small {
+  font-size: 12px;
+}
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+.push {
+  flex: 1;
+}
+
+/* Tables */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  height: 40px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.table th:first-child,
+.table td:first-child {
+  padding-left: 20px;
+}
+.table th:last-child,
+.table td:last-child {
+  padding-right: 16px;
+}
+.table td {
+  height: 50px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+.table tbody tr {
+  transition: background-color 140ms var(--ease-out);
+}
+.rowClickable {
+  cursor: pointer;
+}
+.rowClickable:hover {
+  background: #fafbfc;
+}
+.rowSelected,
+.rowSelected:hover {
+  background: var(--color-bg);
+}
+.strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.dark {
+  color: var(--color-text);
+}
+.num {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.twoLine {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+@keyframes detailIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

@@ -1,0 +1,37 @@
+/* Trakio design tokens — mirrors the "Trakio Tokens" variables in Figma.
+   The admin backoffice uses the light set. */
+:root {
+  --color-volt: #d4ff00;
+  --color-ink: #0b0c0e;
+
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-border: #e2e5ec;
+  --color-text: #111318;
+  --color-text-muted: #5e6573;
+  --color-text-faint: #9aa0ab;
+  --color-bar: #bfc4cc;
+  --color-track: #d9dee5;
+
+  --color-success: #33a859;
+  --color-success-text: #24763e;
+  --color-warning: #db8f1a;
+  --color-warning-text: #9a6412;
+  --color-warning-bg: #fcf5e5;
+  --color-danger: #cc3d3d;
+  --color-danger-text: #bf3333;
+  --color-neutral: #737885;
+  --color-neutral-text: #50545d;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-pop: 0 18px 48px rgba(17, 19, 24, 0.14), 0 2px 6px rgba(17, 19, 24, 0.06);
+}
