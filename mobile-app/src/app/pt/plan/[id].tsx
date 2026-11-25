@@ -18,6 +18,7 @@ import { Sheet } from '@/components/Sheet';
 import { IconButton } from '@/components/Surface';
 import { createPlanDays, exerciseLibrary, students, type PlanExercise } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
+import { formatTimeOfDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { easeOut } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
@@ -37,11 +38,12 @@ function repsLabel(e: PlanExercise): string {
 export default function PlanEditor() {
   const { id, student: studentId } = useLocalSearchParams<{ id: string; student?: string }>();
   const insets = useSafeAreaInsets();
-  const { plans } = useTrainer();
+  const { plans, planDays, savePlanDays, sendMessage } = useTrainer();
   const student = students.find((s) => s.id === studentId);
   const plan = plans.find((p) => p.id === id);
+  const storeKey = student ? `student:${student.id}` : (plan?.id ?? id);
 
-  const [days, setDays] = useState(createPlanDays);
+  const [days, setDays] = useState(() => planDays[storeKey] ?? createPlanDays());
   const [dayId, setDayId] = useState(days[0].id);
   const [openId, setOpenId] = useState<string | null>('supino-inclinado');
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -94,6 +96,19 @@ export default function PlanEditor() {
   };
 
   const finish = () => {
+    savePlanDays(storeKey, days);
+    if (student) {
+      const now = new Date();
+      const total = days.reduce((n, d) => n + d.exercises.length, 0);
+      sendMessage(student.id, {
+        id: `m-${now.getTime()}`,
+        from: 'system',
+        kind: 'workout',
+        title: 'Plano atualizado',
+        detail: `${days.length} treinos · ${total} exercícios · a partir do próximo treino`,
+        time: formatTimeOfDay(now),
+      });
+    }
     haptics.success();
     router.back();
   };

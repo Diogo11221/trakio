@@ -24,6 +24,20 @@ export type ClientProfile = {
   experience: Experience;
   /** Chosen on Boas-vindas: "Com o meu PT" vs "Sozinho". */
   coached: boolean;
+  /** The PT hired in the marketplace (or the demo PT for "Com o meu PT"). */
+  trainer: TrainerLink | null;
+};
+
+export type TrainerLink = { id: Person; name: string; article: 'a' | 'o'; pack: string; price: number; period: string };
+
+/** Rita — the PT behind "Com o meu PT" until the marketplace links real accounts. */
+export const demoTrainerLink: TrainerLink = {
+  id: 'rita',
+  name: 'Rita Santos',
+  article: 'a',
+  pack: 'Treino + Nutrição',
+  price: 45,
+  period: 'mês',
 };
 
 export type TrainerProfile = {

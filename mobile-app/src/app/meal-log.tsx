@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -19,39 +20,133 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { PressableScale } from '@/components/PressableScale';
 import { IconButton } from '@/components/Surface';
-import { lunchEstimate, type EstimatedFood } from '@/features/nutrition/data';
+import { slotForHour, slots, useDiary } from '@/features/nutrition/diary';
+import { parseMeal, totals, type FoodItem } from '@/features/nutrition/foods';
+import { formatTimeOfDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { dayKey, newId } from '@/lib/persist';
 import { enterRise, layoutGlide } from '@/theme/motion';
 import { colors, durations, fonts, pagePadding } from '@/theme/tokens';
 
 const GRAM_STEP = 5;
 const STEP_DISTANCE = 10;
 
-/** Cliente · Registar refeição com IA — estimate, edit, then confirm. Nothing is saved without confirmation. */
+type Bubble =
+  | { id: string; from: 'user'; text: string | null; photoUri: string | null; time: string }
+  | { id: string; from: 'ai'; text: string };
+
+/**
+ * Cliente · Registar refeição com IA (Premium) — write (or dictate) what you
+ * ate; the estimate is editable and nothing is saved without "Confirmar".
+ * Recognition runs on a local food table until backend-ai exists, so photos
+ * are kept with the meal but not read yet.
+ */
 export default function MealLog() {
   const insets = useSafeAreaInsets();
-  const [foods, setFoods] = useState<EstimatedFood[]>(lunchEstimate);
-  const [thinking, setThinking] = useState(true);
+  const params = useLocalSearchParams<{ day?: string }>();
+  const { addMeal } = useDiary();
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const [bubbles, setBubbles] = useState<Bubble[]>([
+    { id: 'hello', from: 'ai', text: 'Diz-me o que comeste — por exemplo “2 ovos, 150 g de frango, arroz e salada”. Também podes juntar uma foto.' },
+  ]);
+  const [foods, setFoods] = useState<FoodItem[]>([]);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [thinking, setThinking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Give the "AI" a beat to answer so the estimate arrives like a reply.
-  useEffect(() => {
-    const id = setTimeout(() => {
-      setThinking(false);
-      haptics.tick();
-    }, 1100);
-    return () => clearTimeout(id);
+  useEffect(() => () => {
+    if (pending.current) clearTimeout(pending.current);
   }, []);
 
-  const kcal = Math.round(foods.reduce((sum, f) => sum + f.grams * f.kcalPerGram, 0));
-  const ratio = kcal / 519;
-  const macros = { protein: Math.round(54 * ratio), carbs: Math.round(44 * ratio), fat: Math.round(13 * ratio) };
+  const sum = totals(foods);
+  const scrollDown = () => setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 80);
+
+  /** The "AI" answers after a beat, like a reply. */
+  const reply = (text: string, after: () => void = () => undefined) => {
+    setThinking(true);
+    scrollDown();
+    pending.current = setTimeout(() => {
+      setThinking(false);
+      setBubbles((b) => [...b, { id: newId('ai'), from: 'ai', text }]);
+      after();
+      haptics.tick();
+      scrollDown();
+    }, 900);
+  };
+
+  const sendText = () => {
+    const text = draft.trim();
+    if (!text) return;
+    setDraft('');
+    haptics.tap();
+    setBubbles((b) => [...b, { id: newId('me'), from: 'user', text, photoUri: null, time: formatTimeOfDay(new Date()) }]);
+    const { items, unknown } = parseMeal(text);
+    if (items.length === 0) {
+      reply('Não reconheci nenhum alimento. Experimenta palavras simples como “frango”, “arroz”, “pão” ou “iogurte”.');
+      return;
+    }
+    let merged = foods;
+    for (const item of items) {
+      merged = merged.some((f) => f.id === item.id)
+        ? merged.map((f) => (f.id === item.id ? { ...f, grams: f.grams + item.grams } : f))
+        : [...merged, item];
+    }
+    const extra = unknown.length > 0 ? ` Não reconheci: ${unknown.join(', ')}.` : '';
+    reply(`Identifiquei ${merged.length} ${merged.length === 1 ? 'alimento' : 'alimentos'}. Confirma as quantidades antes de gravar.${extra}`, () =>
+      setFoods(merged),
+    );
+  };
+
+  const attachPhoto = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) return;
+    }
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+    const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+    const uri = result.canceled ? null : (result.assets[0]?.uri ?? null);
+    if (!uri) return;
+    setPhotoUri(uri);
+    setBubbles((b) => [...b, { id: newId('me'), from: 'user', text: null, photoUri: uri, time: formatTimeOfDay(new Date()) }]);
+    reply(
+      foods.length > 0
+        ? 'Juntei a foto a esta refeição.'
+        : 'Guardo a foto com a refeição. Nesta versão ainda não leio fotos — escreve o que está no prato e eu faço as contas.',
+    );
+  };
+
+  const pickPhoto = () =>
+    Alert.alert('Juntar foto', undefined, [
+      { text: 'Tirar foto', onPress: () => attachPhoto('camera') },
+      { text: 'Escolher da galeria', onPress: () => attachPhoto('library') },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+
+  const voice = () =>
+    Alert.alert('Registo por voz', 'Chega com o servidor de IA. Por agora, usa o microfone do teclado para ditar a refeição.');
 
   const setGrams = (id: string, delta: number) =>
-    setFoods((list) =>
-      list.map((f) => (f.id === id ? { ...f, grams: Math.max(0, f.grams + delta * GRAM_STEP) } : f)),
-    );
+    setFoods((list) => list.map((f) => (f.id === id ? { ...f, grams: Math.max(0, f.grams + delta * GRAM_STEP) } : f)));
+
+  const save = () => {
+    const now = new Date();
+    const day = params.day ?? dayKey(now);
+    const slot = slotForHour(now.getHours());
+    addMeal(day, {
+      id: newId('meal'),
+      slot,
+      time: formatTimeOfDay(now),
+      items: foods.filter((f) => f.grams > 0),
+      source: 'ai',
+      photoUri,
+    });
+    haptics.success();
+    router.back();
+  };
+
+  const slotName = slots.find((s) => s.id === slotForHour(new Date().getHours()))?.name ?? 'Refeição';
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -65,34 +160,43 @@ export default function MealLog() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={enterRise(120)} style={styles.userMessage}>
-          <View style={styles.bubble}>
-            <Image source={require('@/assets/figma/photo-lunch.jpg')} style={styles.photo} contentFit="cover" />
-            <AppText variant="label" style={styles.bubbleText}>
-              Almoço
-            </AppText>
-          </View>
-          <AppText style={styles.time}>13:02</AppText>
-        </Animated.View>
-
-        <View style={styles.aiMessage}>
-          <View style={styles.aiAvatar}>
-            <View style={styles.aiAvatarDot} />
-          </View>
-          {thinking ? (
-            <TypingDots />
+      <ScrollView ref={scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardDismissMode="interactive">
+        {bubbles.map((bubble) =>
+          bubble.from === 'user' ? (
+            <Animated.View key={bubble.id} entering={enterRise(0)} style={styles.userMessage}>
+              <View style={styles.bubble}>
+                {bubble.photoUri ? <Image source={{ uri: bubble.photoUri }} style={styles.photo} contentFit="cover" /> : null}
+                {bubble.text ? (
+                  <AppText variant="label" style={styles.bubbleText}>
+                    {bubble.text}
+                  </AppText>
+                ) : null}
+              </View>
+              <AppText style={styles.time}>{bubble.time}</AppText>
+            </Animated.View>
           ) : (
-            <Animated.View entering={FadeIn.duration(260)} style={styles.flex}>
-              <AppText variant="label" style={styles.aiText}>
-                Identifiquei {foods.length} alimentos. Confirma as quantidades antes de gravar.
+            <Animated.View key={bubble.id} entering={FadeIn.duration(260)} style={styles.aiMessage}>
+              <View style={styles.aiAvatar}>
+                <View style={styles.aiAvatarDot} />
+              </View>
+              <AppText variant="label" style={[styles.aiText, styles.flex]}>
+                {bubble.text}
               </AppText>
             </Animated.View>
-          )}
-        </View>
+          ),
+        )}
 
-        {!thinking ? (
-          <Animated.View entering={enterRise(120)} style={styles.estimate}>
+        {thinking ? (
+          <View style={styles.aiMessage}>
+            <View style={styles.aiAvatar}>
+              <View style={styles.aiAvatarDot} />
+            </View>
+            <TypingDots />
+          </View>
+        ) : null}
+
+        {foods.length > 0 && !thinking ? (
+          <Animated.View entering={enterRise(60)} style={styles.estimate}>
             <View>
               {foods.map((food, i) => (
                 <Animated.View
@@ -132,7 +236,7 @@ export default function MealLog() {
                         <AppText style={styles.miniStepText}>+</AppText>
                       </PressableScale>
                     ) : null}
-                    <AppText style={styles.foodKcal}>{Math.round(food.grams * food.kcalPerGram)}</AppText>
+                    <AppText style={styles.foodKcal}>{Math.round(food.grams * food.per.kcal)}</AppText>
                   </View>
                 </Animated.View>
               ))}
@@ -140,11 +244,11 @@ export default function MealLog() {
 
             <View style={styles.total}>
               <View style={styles.totalRow}>
-                <AppText style={styles.totalValue}>{kcal}</AppText>
-                <AppText style={styles.totalUnit}>kcal</AppText>
+                <AppText style={styles.totalValue}>{sum.kcal}</AppText>
+                <AppText style={styles.totalUnit}>kcal · {slotName.toLowerCase()}</AppText>
               </View>
               <AppText variant="caption" tone="muted" style={styles.macros}>
-                Proteína {macros.protein} g · Hidratos {macros.carbs} g · Gordura {macros.fat} g
+                Proteína {sum.protein} g · Hidratos {sum.carbs} g · Gordura {sum.fat} g
               </AppText>
             </View>
 
@@ -158,16 +262,7 @@ export default function MealLog() {
                 <AppText style={styles.editText}>{editing ? 'Pronto' : 'Editar'}</AppText>
               </PressableScale>
               <View style={styles.flex}>
-                <Button
-                  label="Confirmar e gravar"
-                  height={46}
-                  style={styles.confirm}
-                  onPress={() => {
-                    haptics.success();
-                    router.back();
-                  }}
-                  haptic={null}
-                />
+                <Button label="Confirmar e gravar" height={46} style={styles.confirm} onPress={save} haptic={null} />
               </View>
             </View>
           </Animated.View>
@@ -179,14 +274,17 @@ export default function MealLog() {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="Escreve, fala ou envia foto"
+            onSubmitEditing={sendText}
+            returnKeyType="send"
+            placeholder="Escreve o que comeste"
             placeholderTextColor={colors.textMuted}
             selectionColor={colors.volt}
             keyboardAppearance="dark"
             style={styles.inputText}
+            accessibilityLabel="O que comeste?"
           />
-          <IconButton icon="camera" size={34} iconSize={18} accessibilityLabel="Enviar foto" />
-          <IconButton icon="mic" size={34} iconSize={16} accessibilityLabel="Gravar áudio" />
+          <IconButton icon="camera" size={34} iconSize={18} onPress={pickPhoto} accessibilityLabel="Juntar foto" />
+          <IconButton icon="mic" size={34} iconSize={16} onPress={voice} accessibilityLabel="Gravar áudio" />
         </View>
       </View>
     </KeyboardAvoidingView>

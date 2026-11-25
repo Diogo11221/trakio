@@ -40,6 +40,7 @@ export const emptyClient: ClientDraft = {
   daysPerWeek: 3,
   experience: 'new',
   coached: false,
+  trainer: null,
 };
 
 export const emptyTrainer: TrainerDraft = {

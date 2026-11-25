@@ -22,7 +22,7 @@ import {
   type ClientDraft,
   type TrainerDraft,
 } from '@/features/auth/ProfileSteps';
-import { experienceLabel } from '@/features/auth/types';
+import { demoTrainerLink, experienceLabel } from '@/features/auth/types';
 import { ToolGrid } from '@/features/tools/components';
 import { ageFrom, bodyFromProfile, goalLabel } from '@/features/tools/data';
 import { NumberFieldAccessory } from '@/features/workout/components/NumberField';
@@ -140,7 +140,13 @@ export default function Onboarding() {
     try {
       const saved = await saveProfile(
         role === 'client'
-          ? { kind: 'client', ...client, name: client.name.trim(), coached: mode === 'coached' }
+          ? {
+              kind: 'client',
+              ...client,
+              name: client.name.trim(),
+              coached: mode === 'coached',
+              trainer: mode === 'coached' ? demoTrainerLink : null,
+            }
           : { kind: 'trainer', ...trainer, name: trainer.name.trim(), city: trainer.city.trim() },
       );
       if (role === 'trainer') setMode('trainer');

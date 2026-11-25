@@ -8,6 +8,12 @@ import { Platform } from 'react-native';
  */
 let player: AudioPlayer | null = null;
 let configured = false;
+let enabled = true;
+
+/** "Som do fim do descanso" in Perfil. */
+export function setPlimEnabled(value: boolean) {
+  enabled = value;
+}
 
 async function ensurePlayer(): Promise<AudioPlayer | null> {
   if (Platform.OS === 'web') return null;
@@ -25,6 +31,7 @@ export function preloadPlim() {
 }
 
 export async function playPlim() {
+  if (!enabled) return;
   const p = await ensurePlayer();
   if (!p) return;
   try {
