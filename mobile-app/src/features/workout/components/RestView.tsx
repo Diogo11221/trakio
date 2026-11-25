@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, FadeIn, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
@@ -14,6 +14,7 @@ import { Stepper } from '@/features/workout/components/Stepper';
 import { activeSetIndex, type RestState } from '@/features/workout/store';
 import { formatClock, formatKg } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { playPlim } from '@/lib/sound';
 import { useNow } from '@/lib/useNow';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -30,6 +31,10 @@ type RestViewProps = {
 
 /** Cliente · Treino B · Descanso. */
 export function RestView({ rest, finished, next, onAdjust, onShift, onDone }: RestViewProps) {
+  const { height } = useWindowDimensions();
+  // 256 pt on a 844 pt screen (Figma); shrinks on shorter phones so nothing overlaps.
+  const ringSize = Math.round(Math.min(256, Math.max(188, height * 0.3)));
+  const compact = height < 800;
   const now = useNow(250);
   const remainingMs = Math.max(0, rest.endsAt - now);
   const remaining = Math.ceil(remainingMs / 1000);
@@ -53,12 +58,13 @@ export function RestView({ rest, finished, next, onAdjust, onShift, onDone }: Re
     if (remaining > 0 && remaining <= 3) haptics.tap();
     if (remaining === 0) {
       haptics.restOver();
+      playPlim();
       onDone();
     }
   }, [onDone, remaining]);
 
   return (
-    <Animated.View entering={FadeIn.duration(320)} style={styles.root}>
+    <Animated.View entering={FadeIn.duration(320)} style={[styles.root, { gap: compact ? 16 : 22 }]}>
       <View style={styles.logged}>
         <Image source={require('@/assets/figma/render-bench.jpg')} style={styles.thumb} contentFit="cover" />
         <View style={styles.flex}>
@@ -72,11 +78,11 @@ export function RestView({ rest, finished, next, onAdjust, onShift, onDone }: Re
         </View>
       </View>
 
-      <ProgressRing size={256} strokeWidth={11.6} progress={progress} trackColor={colors.ringTrack} knob>
+      <ProgressRing size={ringSize} strokeWidth={ringSize * 0.045} progress={progress} trackColor={colors.ringTrack} knob>
         <AppText variant="caption" tone="muted" style={styles.ringLabel}>
           Descanso
         </AppText>
-        <AppText style={styles.clock} accessibilityLiveRegion="polite">
+        <AppText style={[styles.clock, { fontSize: ringSize / 4, letterSpacing: -ringSize / 80 }]} accessibilityLiveRegion="polite">
           {formatClock(remaining)}
         </AppText>
         <AppText variant="numberSmall" tone="muted" style={styles.ringTotal}>
@@ -113,7 +119,7 @@ export function RestView({ rest, finished, next, onAdjust, onShift, onDone }: Re
               value={String(nextSet.reps)}
               unit="repetições"
               onStep={(d) => onAdjust('reps', d)}
-              style={styles.reps}
+              style={styles.flex}
               accessibilityLabel="Repetições da próxima série"
             />
           </View>
@@ -135,7 +141,7 @@ function ShiftButton({ label, onPress }: { label: string; onPress: () => void })
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center', gap: 26 },
+  root: { flex: 1, alignItems: 'center' },
   flex: { flex: 1 },
   flexFill: { flex: 1, minHeight: 0 },
   logged: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, alignSelf: 'stretch' },
@@ -167,5 +173,4 @@ const styles = StyleSheet.create({
   next: { alignSelf: 'stretch', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
   nextLabel: { fontFamily: fonts.uiMedium },
   steppers: { flexDirection: 'row', gap: 10 },
-  reps: { width: 128 },
 });

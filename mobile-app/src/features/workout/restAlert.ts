@@ -10,8 +10,8 @@ let prepared = false;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    // In the foreground the in-app timer already vibrates — don't double up.
-    shouldShowBanner: false,
+    // Show the banner even with the app open; the in-app "plim" covers the sound.
+    shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: false,
     shouldSetBadge: false,

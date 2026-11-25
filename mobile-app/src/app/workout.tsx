@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
@@ -18,10 +18,12 @@ import { SET_COLUMNS, SetRow } from '@/features/workout/components/SetRow';
 import { WorkoutProgress } from '@/features/workout/components/WorkoutProgress';
 import { cancelRestAlert, prepareRestAlerts, scheduleRestAlert } from '@/features/workout/restAlert';
 import { activeSetIndex, useWorkout } from '@/features/workout/store';
+import { preloadPlim } from '@/lib/sound';
 import { formatClock } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useNow } from '@/lib/useNow';
 import { useSettings } from '@/state/settings';
+import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
 
 /** Cliente · Treino A (série em curso) ⇄ B (descanso), with D (ordem) as a sheet. Tab bar hidden: focus mode. */
@@ -36,6 +38,7 @@ export default function Workout() {
 
   useEffect(() => {
     start();
+    preloadPlim();
     prepareRestAlerts().catch(() => undefined);
   }, [start]);
 
@@ -93,7 +96,7 @@ export default function Workout() {
           key="rest"
           entering={FadeIn.duration(260)}
           exiting={FadeOut.duration(180)}
-          style={[styles.rest, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 10 }]}
+          style={[StyleSheet.absoluteFill, styles.rest, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 10 }]}
         >
           <View style={styles.restTop}>
             <Pressable onPress={leave} hitSlop={12} accessibilityRole="button" accessibilityLabel="Voltar">
@@ -112,7 +115,7 @@ export default function Workout() {
           />
         </Animated.View>
       ) : (
-        <Animated.View key="set" entering={FadeIn.duration(260)} exiting={FadeOut.duration(180)} style={styles.fill}>
+        <Animated.View key="set" entering={FadeIn.duration(260)} exiting={FadeOut.duration(180)} style={StyleSheet.absoluteFill}>
           <ScrollView
             style={styles.fill}
             contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}
@@ -155,7 +158,7 @@ export default function Workout() {
                 <AppText style={[styles.checkHead, { width: SET_COLUMNS.check }]}>✓</AppText>
               </View>
               {current.sets.map((entry, i) => (
-                <Animated.View key={`${current.id}-${i}`} layout={LinearTransition.springify().damping(20)}>
+                <Animated.View key={`${current.id}-${i}`} layout={layoutGlide}>
                   <SetRow
                     number={i + 1}
                     entry={entry}
@@ -292,6 +295,7 @@ const styles = StyleSheet.create({
   viewAll: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   viewAllText: { fontFamily: fonts.uiMedium },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 28, paddingHorizontal: pagePadding },
-  rest: { flex: 1, paddingHorizontal: pagePadding, gap: 26 },
+  // Both states are absolutely stacked so the swap is a crossfade in place, not a jump.
+  rest: { paddingHorizontal: pagePadding, gap: 22 },
   restTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });
