@@ -2,7 +2,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,10 +18,16 @@ import { OrderSheet } from '@/features/workout/components/OrderSheet';
 import { RestView } from '@/features/workout/components/RestView';
 import { SET_COLUMNS, SetRow } from '@/features/workout/components/SetRow';
 import { WorkoutProgress } from '@/features/workout/components/WorkoutProgress';
-import { cancelRestAlert, prepareRestAlerts, scheduleRestAlert } from '@/features/workout/restAlert';
+import {
+  cancelRestAlert,
+  clearWorkoutStatus,
+  prepareRestAlerts,
+  scheduleRestAlert,
+  showWorkoutStatus,
+} from '@/features/workout/restAlert';
 import { activeSetIndex, useWorkout } from '@/features/workout/store';
 import { preloadPlim } from '@/lib/sound';
-import { formatClock } from '@/lib/format';
+import { formatClock, formatKg } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useNow } from '@/lib/useNow';
 import { useSettings } from '@/state/settings';
@@ -88,6 +94,43 @@ export default function Workout() {
     }).catch(() => undefined);
     // Re-scheduled when the end time moves (±15 s) or the next set is edited.
   }, [rest, lockScreenAlert, state.plan, state.currentId]);
+
+  // Going to the background mid-workout posts a status notification with where
+  // you are; coming back clears it.
+  const { plan, currentId } = state;
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        clearWorkoutStatus();
+        return;
+      }
+      if (next !== 'background' || state.finishedAt) return;
+      const exercise = plan.exercises.find((e) => e.id === currentId);
+      if (!exercise) return;
+      const index = activeSetIndex(exercise);
+      const set = exercise.sets[index];
+      const nextSet = set ? `Série ${index + 1} de ${exercise.sets.length}: ${formatKg(set.kg)} kg × ${set.reps}` : '';
+      if (rest && rest.endsAt > Date.now()) {
+        const ends = new Date(rest.endsAt);
+        const hh = String(ends.getHours()).padStart(2, '0');
+        const mm = String(ends.getMinutes()).padStart(2, '0');
+        const ss = String(ends.getSeconds()).padStart(2, '0');
+        showWorkoutStatus({
+          title: `Descanso · termina às ${hh}:${mm}:${ss}`,
+          body: `Próxima · ${exercise.name} — ${nextSet}`,
+        }).catch(() => undefined);
+      } else {
+        showWorkoutStatus({
+          title: `${plan.title} em curso · ${exercise.name}`,
+          body: nextSet,
+        }).catch(() => undefined);
+      }
+    });
+    return () => sub.remove();
+  }, [currentId, plan, rest, state.finishedAt]);
+
+  // Leaving the workout screen (finish, sign-out) clears the status.
+  useEffect(() => () => void clearWorkoutStatus(), []);
 
   const endRest = useCallback(() => {
     cancelRestAlert();

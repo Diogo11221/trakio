@@ -23,6 +23,7 @@ import { haptics } from '@/lib/haptics';
 import { useSettings } from '@/state/settings';
 import { enterRise } from '@/theme/motion';
 import { colors, fonts, springs } from '@/theme/tokens';
+import { refreshMockData } from '@/lib/refresh';
 
 const dayLabels = ['Hoje', 'Ontem', 'Domingo', 'Sábado', 'Sexta'];
 
@@ -50,6 +51,7 @@ export default function Nutrition() {
       <Screen
         gap={18}
         bottomInset={96}
+        onRefresh={refreshMockData}
         overlay={
           <Animated.View entering={enterRise(380)} style={styles.fabWrap}>
             <PressableScale onPress={openLogger} haptic="press" style={styles.fab} accessibilityLabel="Registar com IA">

@@ -1,22 +1,10 @@
-import { useState } from 'react';
-import {
-  InputAccessoryView,
-  Keyboard,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, TextInput, type ViewStyle } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { haptics } from '@/lib/haptics';
 import { colors, durations, fonts, radii } from '@/theme/tokens';
-
-/** Shared iOS keyboard toolbar — the number pads have no return key. */
-export const NUMBER_ACCESSORY_ID = 'trakio-number-done';
 
 type NumberFieldProps = {
   value: number;
@@ -67,7 +55,6 @@ export function NumberField({ value, format, onChange, decimals, accessibilityLa
         selectTextOnFocus
         keyboardAppearance="dark"
         selectionColor={colors.volt}
-        inputAccessoryViewID={Platform.OS === 'ios' ? NUMBER_ACCESSORY_ID : undefined}
         maxLength={decimals ? 6 : 3}
         accessibilityLabel={accessibilityLabel}
         style={styles.input}
@@ -76,17 +63,39 @@ export function NumberField({ value, format, onChange, decimals, accessibilityLa
   );
 }
 
-/** Render once per screen that uses NumberField. */
+/**
+ * "OK" bar that rides on top of the keyboard — the iOS number pads have no
+ * return key. Render once per screen that uses NumberField.
+ */
 export function NumberFieldAccessory() {
-  if (Platform.OS !== 'ios') return null;
+  const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
+  const offset = useSharedValue(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const show = Keyboard.addListener('keyboardWillShow', (e) => {
+      setKeyboardTop(e.endCoordinates.height);
+      offset.set(withTiming(1, { duration: e.duration || 250 }));
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', (e) => {
+      offset.set(withTiming(0, { duration: e.duration || 250 }));
+      setKeyboardTop(null);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [offset]);
+
+  const barStyle = useAnimatedStyle(() => ({ opacity: offset.get() }));
+
+  if (keyboardTop === null) return null;
   return (
-    <InputAccessoryView nativeID={NUMBER_ACCESSORY_ID} backgroundColor={colors.surfaceRaised}>
-      <View style={styles.accessory}>
-        <Pressable onPress={() => Keyboard.dismiss()} hitSlop={10} accessibilityRole="button">
-          <AppText style={styles.done}>OK</AppText>
-        </Pressable>
-      </View>
-    </InputAccessoryView>
+    <Animated.View style={[styles.accessory, { bottom: keyboardTop }, barStyle]}>
+      <Pressable onPress={() => Keyboard.dismiss()} hitSlop={10} accessibilityRole="button">
+        <AppText style={styles.done}>OK</AppText>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -108,6 +117,10 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   accessory: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surfaceRaised,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     paddingHorizontal: 20,

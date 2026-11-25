@@ -16,6 +16,7 @@ import { Card } from '@/components/Surface';
 import { useWorkout } from '@/features/workout/store';
 import { formatThousands, formatToday, greeting } from '@/lib/format';
 import { colors, fonts, springs } from '@/theme/tokens';
+import { refreshMockData } from '@/lib/refresh';
 
 const readiness = 78;
 const kcal = { eaten: 1361, goal: 2400 };
@@ -27,7 +28,7 @@ export default function Today() {
   const ring = useRingSweep(kcal.eaten / kcal.goal, 300);
 
   return (
-    <Screen gap={18}>
+    <Screen gap={18} onRefresh={refreshMockData}>
       <Reveal index={0} style={styles.header}>
         <View style={styles.headerText}>
           <AppText variant="caption" style={styles.date} tone="muted">

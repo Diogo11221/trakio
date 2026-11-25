@@ -19,6 +19,7 @@ import { SegmentedControl } from '@/components/SegmentedControl';
 import { Card, CardRow, SectionLabel } from '@/components/Surface';
 import { haptics } from '@/lib/haptics';
 import { colors, fonts, springs } from '@/theme/tokens';
+import { refreshMockData } from '@/lib/refresh';
 
 const ranges = [
   { value: '1m', label: '1 mês' },
@@ -48,7 +49,7 @@ export default function Progress() {
   const [range, setRange] = useState<Range>('2m');
 
   return (
-    <Screen gap={16}>
+    <Screen gap={16} onRefresh={refreshMockData}>
       <Reveal index={0} style={styles.header}>
         <AppText variant="title">Progresso</AppText>
         <SegmentedControl options={ranges} value={range} onChange={setRange} />

@@ -14,6 +14,7 @@ import { useWorkout } from '@/features/workout/store';
 import { ManageSubscriptionSheet } from '@/features/profile/ManageSubscriptionSheet';
 import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
+import { refreshMockData } from '@/lib/refresh';
 
 /** Cliente · Perfil e definições. */
 export default function Profile() {
@@ -36,7 +37,7 @@ export default function Profile() {
 
   return (
     <>
-      <Screen gap={14}>
+      <Screen gap={14} onRefresh={refreshMockData}>
         <Reveal index={0} style={styles.header}>
           <Portrait person="miguel" size={56} />
           <View style={styles.headerText}>

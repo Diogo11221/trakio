@@ -11,6 +11,7 @@ import { Card, CardRow } from '@/components/Surface';
 import { recentWorkouts, weekPlan } from '@/features/workout/data';
 import { useWorkout } from '@/features/workout/store';
 import { colors, fonts } from '@/theme/tokens';
+import { refreshMockData } from '@/lib/refresh';
 
 /** Cliente · Treinar — this week's plan and recent sessions. */
 export default function Train() {
@@ -22,7 +23,7 @@ export default function Train() {
   };
 
   return (
-    <Screen gap={16}>
+    <Screen gap={16} onRefresh={refreshMockData}>
       <Reveal index={0}>
         <AppText variant="title">Treinar</AppText>
       </Reveal>
