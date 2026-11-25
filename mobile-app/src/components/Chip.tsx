@@ -11,10 +11,12 @@ type ChipProps = {
   onPress: () => void;
   /** `solid` = light fill (cities), `outline` = Volt outline (specialties). */
   kind?: 'solid' | 'outline';
+  /** Optional count shown after the label in mono (Alunos filters). */
+  count?: number;
 };
 
 /** Filter chip; colours cross-fade instead of snapping. */
-export function Chip({ label, selected, onPress, kind = 'solid' }: ChipProps) {
+export function Chip({ label, selected, onPress, kind = 'solid', count }: ChipProps) {
   const on = useSharedValue(selected ? 1 : 0);
   useEffect(() => {
     on.set(withTiming(selected ? 1 : 0, { duration: durations.fast }));
@@ -38,8 +40,9 @@ export function Chip({ label, selected, onPress, kind = 'solid' }: ChipProps) {
       accessibilityState={{ selected }}
       accessibilityLabel={label}
     >
-      <Animated.View style={[styles.chip, chipStyle]}>
+      <Animated.View style={[styles.chip, count !== undefined && styles.withCount, chipStyle]}>
         <Animated.Text style={[styles.text, textStyle]}>{label}</Animated.Text>
+        {count !== undefined ? <Animated.Text style={[styles.count, textStyle]}>{count}</Animated.Text> : null}
       </Animated.View>
     </PressableScale>
   );
@@ -48,4 +51,6 @@ export function Chip({ label, selected, onPress, kind = 'solid' }: ChipProps) {
 const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7 },
   text: { fontFamily: fonts.uiMedium, fontSize: 13 },
+  withCount: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 10 },
+  count: { fontFamily: fonts.monoMedium, fontSize: 11 },
 });
