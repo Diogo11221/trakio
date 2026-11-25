@@ -9,6 +9,7 @@ import { Logo } from '@/components/Logo';
 import { Reveal } from '@/components/Screen';
 import { TextField } from '@/components/TextField';
 import { haptics } from '@/lib/haptics';
+import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
 
 /** Cliente · Entrar. Auth isn't wired yet — every path lands on "Hoje". */
@@ -18,7 +19,8 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const enter = () => router.replace('/today');
+  const { mode } = useSettings();
+  const enter = () => router.replace(mode === 'trainer' ? '/pt/home' : '/today');
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
