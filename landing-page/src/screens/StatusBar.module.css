@@ -1,0 +1,39 @@
+.bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 390px;
+  height: 54px;
+  padding: 10px 28px 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.time {
+  width: 72px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.island {
+  width: 124px;
+  height: 36px;
+  border-radius: 20px;
+  background: #000;
+}
+.indicators {
+  width: 72px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+.signal {
+  width: 18px;
+  height: 12px;
+}
+.battery {
+  width: 26px;
+  height: 13px;
+}

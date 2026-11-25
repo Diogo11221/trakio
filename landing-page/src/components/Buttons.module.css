@@ -1,0 +1,78 @@
+.primary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-volt);
+  color: var(--color-bg);
+  font-weight: 600;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: normal;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    transform 0.4s var(--ease-out),
+    box-shadow 0.4s var(--ease-out);
+}
+.primary::after {
+  /* Light sweep on hover — a little "metal" catching the light. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  transform: translateX(-110%);
+  transition: transform 0.7s var(--ease-out);
+}
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px -10px rgba(212, 255, 0, 0.45);
+}
+.primary:hover::after {
+  transform: translateX(110%);
+}
+.primary:active {
+  transform: translateY(0);
+}
+
+.small {
+  padding: 10px 16px;
+  font-size: 14px;
+}
+.large {
+  gap: 12px;
+  padding: 16px 24px;
+  font-size: 16px;
+}
+.arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.4s var(--ease-out);
+}
+.large:hover .arrow {
+  transform: translateX(3px);
+}
+
+.arrowLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-text-muted);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  transition: border-color 0.3s ease;
+}
+.arrowLink img {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.4s var(--ease-out);
+}
+.arrowLink:hover {
+  border-color: var(--color-text);
+}
+.arrowLink:hover img {
+  transform: translate(2px, -2px);
+}
