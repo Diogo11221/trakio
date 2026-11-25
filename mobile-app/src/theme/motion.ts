@@ -3,9 +3,9 @@ import { Easing, FadeIn, FadeInDown, LinearTransition } from 'react-native-reani
 /** Shared curves and layout animations — ease-out timings, no springy overshoot. */
 export const easeOut = Easing.out(Easing.cubic);
 
-/** Section entrance: short rise + fade. */
+/** Section entrance: short rise + fade (ease-out, no overshoot). */
 export function enterRise(delay = 0) {
-  return FadeInDown.duration(420).delay(delay).easing(easeOut).withInitialValues({ transform: [{ translateY: 12 }] });
+  return FadeInDown.duration(420).delay(delay).easing(easeOut);
 }
 
 /** Plain fade for things that shouldn't move (check marks, swapped content). */
