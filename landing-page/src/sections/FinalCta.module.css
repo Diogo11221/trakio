@@ -1,0 +1,89 @@
+.section {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 110px var(--page-gutter);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  text-align: center;
+  overflow: hidden;
+}
+/* Concentric machined rings behind the CTA, echoing the plate in the hero. */
+.section::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1100px;
+  height: 1100px;
+  margin: -550px 0 0 -550px;
+  pointer-events: none;
+  background: repeating-radial-gradient(circle, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 7px);
+  mask-image: radial-gradient(circle, #000 0%, transparent 62%);
+}
+
+.logoStage {
+  perspective: 400px;
+}
+.logoStage img {
+  width: 56px;
+  height: 56px;
+  will-change: transform;
+}
+.title {
+  position: relative;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(38px, 4.45vw, 64px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.lead {
+  position: relative;
+  font-size: 18px;
+  color: var(--color-text-muted);
+}
+.actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.volt,
+.store {
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 22px 0 20px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    transform 0.4s var(--ease-out),
+    border-color 0.3s ease,
+    background-color 0.3s ease;
+}
+.volt {
+  background: var(--color-volt);
+  color: var(--color-bg);
+}
+.store {
+  border: 1px solid var(--color-border-strong);
+  background: rgba(11, 12, 14, 0.6);
+}
+.store img {
+  width: 18px;
+  height: 18px;
+}
+.volt:hover,
+.store:hover {
+  transform: translateY(-2px);
+}
+.store:hover {
+  border-color: var(--color-text-muted);
+}
