@@ -25,6 +25,8 @@ type Field = 'kg' | 'reps';
 type Action =
   | { type: 'start'; now: number }
   | { type: 'adjust'; field: Field; delta: number }
+  | { type: 'set'; field: Field; value: number }
+  | { type: 'finish'; now: number }
   | { type: 'completeSet'; now: number }
   | { type: 'skipRest' }
   | { type: 'shiftRest'; seconds: number; now: number }
@@ -84,6 +86,27 @@ function reducer(state: WorkoutState, action: Action): WorkoutState {
       });
       return { ...state, plan };
     }
+
+    case 'set': {
+      // Typed value for the active set. Later sets that still matched the old
+      // value follow along, so typing 85 once updates the whole exercise.
+      const plan = updateExercise(state.plan, state.currentId, (exercise) => {
+        const index = activeSetIndex(exercise);
+        if (index < 0) return exercise;
+        const previous = exercise.sets[index][action.field];
+        const sets = exercise.sets.map((set, i) => {
+          if (i === index || (i > index && !set.done && set[action.field] === previous)) {
+            return { ...set, [action.field]: action.value };
+          }
+          return set;
+        });
+        return { ...exercise, sets };
+      });
+      return { ...state, plan };
+    }
+
+    case 'finish':
+      return { ...state, rest: null, finishedAt: action.now };
 
     case 'completeSet': {
       const exercise = state.plan.exercises.find((e) => e.id === state.currentId);
@@ -173,6 +196,8 @@ type WorkoutContextValue = {
   currentIndex: number;
   start: () => void;
   adjust: (field: Field, delta: number) => void;
+  setValue: (field: Field, value: number) => void;
+  finish: () => void;
   completeSet: () => void;
   skipRest: () => void;
   shiftRest: (seconds: number) => void;
@@ -192,6 +217,8 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
     () => ({
       start: () => dispatch({ type: 'start', now: Date.now() }),
       adjust: (field: Field, delta: number) => dispatch({ type: 'adjust', field, delta }),
+      setValue: (field: Field, value: number) => dispatch({ type: 'set', field, value }),
+      finish: () => dispatch({ type: 'finish', now: Date.now() }),
       completeSet: () => dispatch({ type: 'completeSet', now: Date.now() }),
       skipRest: () => dispatch({ type: 'skipRest' }),
       shiftRest: (seconds: number) => dispatch({ type: 'shiftRest', seconds, now: Date.now() }),

@@ -33,10 +33,11 @@ type OrderSheetProps = {
   onClose: () => void;
   onStartNow: (exerciseId: string) => void;
   onReorder: (from: number, to: number) => void;
+  onFinish: () => void;
 };
 
 /** Cliente · Treino D · Ordem do treino — skip a busy machine, drag to reorder. */
-export function OrderSheet({ visible, plan, currentId, onClose, onStartNow, onReorder }: OrderSheetProps) {
+export function OrderSheet({ visible, plan, currentId, onClose, onStartNow, onReorder, onFinish }: OrderSheetProps) {
   const firstPending = plan.exercises.find((e) => e.status === 'pending')?.id ?? null;
   // `null` = nothing picked yet → default to the next pending exercise.
   const [pickedId, setPickedId] = useState<string | null>(null);
@@ -123,8 +124,9 @@ export function OrderSheet({ visible, plan, currentId, onClose, onStartNow, onRe
         ) : (
           <Button label="Continuar treino" height={54} onPress={close} />
         )}
+        <Button label="Terminar treino" variant="ghost" height={40} onPress={onFinish} />
         <AppText variant="caption" tone="muted">
-          Arrasta para mudar a ordem
+          Mantém premido e arrasta para mudar a ordem
         </AppText>
       </View>
     </Sheet>

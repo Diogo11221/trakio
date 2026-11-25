@@ -2,7 +2,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,8 @@ import { Icon } from '@/components/Icon';
 import { PressableScale } from '@/components/PressableScale';
 import { IconButton } from '@/components/Surface';
 import { DEMO_HEIGHT, ExerciseDemo } from '@/features/workout/components/ExerciseDemo';
+import { EndWorkoutSheet } from '@/features/workout/components/EndWorkoutSheet';
+import { NumberFieldAccessory } from '@/features/workout/components/NumberField';
 import { OrderSheet } from '@/features/workout/components/OrderSheet';
 import { RestView } from '@/features/workout/components/RestView';
 import { SET_COLUMNS, SetRow } from '@/features/workout/components/SetRow';
@@ -27,13 +29,31 @@ import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
 
 /** Cliente · Treino A (série em curso) ⇄ B (descanso), with D (ordem) as a sheet. Tab bar hidden: focus mode. */
-export default function Workout() {
+/** Screen stays on during the workout (native only — browsers may refuse the wake lock). */
+function KeepScreenOn() {
   useKeepAwake();
+  return null;
+}
+
+export default function Workout() {
   const insets = useSafeAreaInsets();
   const { lockScreenAlert } = useSettings();
-  const { state, current, currentIndex, adjust, completeSet, skipRest, shiftRest, switchTo, reorder, start } =
-    useWorkout();
+  const {
+    state,
+    current,
+    currentIndex,
+    adjust,
+    setValue,
+    completeSet,
+    skipRest,
+    shiftRest,
+    switchTo,
+    reorder,
+    start,
+    finish,
+  } = useWorkout();
   const [orderOpen, setOrderOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
   const now = useNow(1000);
 
   useEffect(() => {
@@ -74,7 +94,9 @@ export default function Workout() {
     skipRest();
   }, [skipRest]);
 
+  // The only way to log a set (and start the rest) is the "Concluir série" button.
   const onComplete = () => {
+    Keyboard.dismiss();
     haptics.success();
     completeSet();
   };
@@ -84,13 +106,17 @@ export default function Workout() {
   const upNext = state.plan.exercises.find((e, i) => i > currentIndex && e.status === 'pending');
   const finishedExercise = rest ? state.plan.exercises.find((e) => e.id === rest.exerciseId) : undefined;
 
+  const allSets = state.plan.exercises.flatMap((e) => e.sets);
+  const doneSets = allSets.filter((s) => s.done).length;
+
   const leave = () => {
-    haptics.tap();
-    router.back();
+    Keyboard.dismiss();
+    setExitOpen(true);
   };
 
   return (
     <View style={styles.root}>
+      {Platform.OS !== 'web' ? <KeepScreenOn /> : null}
       {rest && finishedExercise ? (
         <Animated.View
           key="rest"
@@ -120,6 +146,9 @@ export default function Workout() {
             style={styles.fill}
             contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets
           >
             <View style={styles.demoSlot}>
               <ExerciseDemo name={current.name} />
@@ -163,8 +192,7 @@ export default function Workout() {
                     number={i + 1}
                     entry={entry}
                     state={entry.done ? 'done' : i === activeIndex ? 'active' : 'pending'}
-                    onAdjust={adjust}
-                    onComplete={onComplete}
+                    onSet={setValue}
                   />
                 </Animated.View>
               ))}
@@ -214,11 +242,33 @@ export default function Workout() {
         </Animated.View>
       )}
 
+      <NumberFieldAccessory />
+
+      <EndWorkoutSheet
+        visible={exitOpen}
+        doneSets={doneSets}
+        totalSets={allSets.length}
+        onClose={() => setExitOpen(false)}
+        onFinish={() => {
+          setExitOpen(false);
+          cancelRestAlert();
+          finish();
+        }}
+        onLeave={() => {
+          setExitOpen(false);
+          router.back();
+        }}
+      />
+
       <OrderSheet
         visible={orderOpen}
         plan={state.plan}
         currentId={state.currentId}
         onClose={() => setOrderOpen(false)}
+        onFinish={() => {
+          setOrderOpen(false);
+          setExitOpen(true);
+        }}
         onReorder={reorder}
         onStartNow={(id) => {
           haptics.success();

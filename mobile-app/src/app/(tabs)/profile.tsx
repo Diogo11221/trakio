@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
@@ -10,6 +10,7 @@ import { Reveal, Screen } from '@/components/Screen';
 import { Card, CardRow, Pill, SectionLabel } from '@/components/Surface';
 import { Toggle } from '@/components/Toggle';
 import { PremiumSheet } from '@/features/nutrition/PremiumSheet';
+import { useWorkout } from '@/features/workout/store';
 import { ManageSubscriptionSheet } from '@/features/profile/ManageSubscriptionSheet';
 import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
@@ -18,6 +19,20 @@ import { colors, fonts } from '@/theme/tokens';
 export default function Profile() {
   const { vibration, setVibration, lockScreenAlert, setLockScreenAlert, premium, setPremium } = useSettings();
   const [sheet, setSheet] = useState<'premium' | 'manage' | null>(null);
+  const { reset } = useWorkout();
+
+  const signOut = () =>
+    Alert.alert('Terminar sessão?', 'Vais precisar de entrar outra vez para ver o teu plano.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Terminar sessão',
+        style: 'destructive',
+        onPress: () => {
+          reset();
+          router.replace('/welcome');
+        },
+      },
+    ]);
 
   return (
     <>
@@ -101,6 +116,20 @@ export default function Profile() {
             <SettingRow label="Idioma" value="Português (PT)" last />
           </Card>
         </Reveal>
+
+        <Reveal index={9}>
+          <PressableScale
+            onPress={signOut}
+            haptic="tap"
+            pressedScale={0.98}
+            accessibilityRole="button"
+            style={styles.signOut}
+          >
+            <AppText variant="label" tone="muted">
+              Terminar sessão
+            </AppText>
+          </PressableScale>
+        </Reveal>
       </Screen>
 
       <PremiumSheet
@@ -170,4 +199,12 @@ const styles = StyleSheet.create({
   message: { backgroundColor: colors.surfaceRaised, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
   messageText: { fontFamily: fonts.uiMedium, fontSize: 12, color: colors.text },
   setting: { height: 50, paddingLeft: 16, paddingRight: 14 },
+  signOut: {
+    height: 50,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

@@ -1,33 +1,22 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
-import Animated, {
-  interpolate,
-  interpolateColor,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
+import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
 import type { SetEntry } from '@/features/workout/data';
-import { ScrubValue } from '@/features/workout/components/ScrubValue';
+import { NumberField } from '@/features/workout/components/NumberField';
 import { formatKg } from '@/lib/format';
-import { haptics } from '@/lib/haptics';
 import { enterFade } from '@/theme/motion';
-import { colors, fonts, radii, springs } from '@/theme/tokens';
+import { colors, fonts, radii } from '@/theme/tokens';
 
 export const SET_COLUMNS = { set: 28, previous: 86, reps: 56, check: 30 } as const;
-
-const COMPLETE_DISTANCE = 96;
 
 type SetRowProps = {
   number: number;
   entry: SetEntry;
   state: 'done' | 'active' | 'pending';
-  onAdjust?: (field: 'kg' | 'reps', steps: number) => void;
-  onComplete?: () => void;
+  /** Sets an exact value on the active set (typed in the field). */
+  onSet?: (field: 'kg' | 'reps', value: number) => void;
 };
 
 function previousLabel(entry: SetEntry) {
@@ -35,9 +24,9 @@ function previousLabel(entry: SetEntry) {
 }
 
 /** "Treino/Linha de série" — Feita / Ativa / Por fazer. */
-export function SetRow({ number, entry, state, onAdjust, onComplete }: SetRowProps) {
+export function SetRow({ number, entry, state, onSet }: SetRowProps) {
   if (state === 'active') {
-    return <ActiveSetRow number={number} entry={entry} onAdjust={onAdjust} onComplete={onComplete} />;
+    return <ActiveSetRow number={number} entry={entry} onSet={onSet} />;
   }
   const done = state === 'done';
   return (
@@ -59,83 +48,30 @@ export function SetRow({ number, entry, state, onAdjust, onComplete }: SetRowPro
   );
 }
 
-function ActiveSetRow({
-  number,
-  entry,
-  onAdjust,
-  onComplete,
-}: Omit<SetRowProps, 'state'>) {
-  const dx = useSharedValue(0);
-  const armed = useSharedValue(false);
-
-  const complete = () => onComplete?.();
-
-  // Swipe the active row to the right to log it — the Volt wash shows how close you are.
-  const swipe = usePanGesture({
-    activeOffsetX: 14,
-    failOffsetY: [-12, 12],
-    onUpdate: (e) => {
-      'worklet';
-      const x = Math.max(0, e.translationX);
-      dx.set(x < COMPLETE_DISTANCE ? x : COMPLETE_DISTANCE + (x - COMPLETE_DISTANCE) * 0.25);
-      const beyond = x >= COMPLETE_DISTANCE;
-      if (beyond !== armed.get()) {
-        armed.set(beyond);
-        scheduleOnRN(beyond ? haptics.threshold : haptics.tick);
-      }
-    },
-    onDeactivate: () => {
-      'worklet';
-      if (armed.get()) scheduleOnRN(complete);
-      armed.set(false);
-      dx.set(withSpring(0, springs.snappy));
-    },
-  });
-
-  const rowStyle = useAnimatedStyle(() => ({ transform: [{ translateX: dx.get() * 0.5 }] }));
-  const washStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(dx.get(), [0, COMPLETE_DISTANCE], [0, 0.22], 'clamp'),
-  }));
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(dx.get(), [0, COMPLETE_DISTANCE], [1, 1.08], 'clamp') }],
-    backgroundColor: interpolateColor(
-      dx.get(),
-      [COMPLETE_DISTANCE * 0.7, COMPLETE_DISTANCE],
-      ['rgba(212,255,0,0)', colors.volt],
-    ),
-  }));
-
+function ActiveSetRow({ number, entry, onSet }: Omit<SetRowProps, 'state'>) {
   return (
-    <GestureDetector gesture={swipe}>
-      <Animated.View style={[styles.row, styles.active, rowStyle]}>
-        <Animated.View style={[StyleSheet.absoluteFill, styles.wash, washStyle]} pointerEvents="none" />
-        <AppText style={[styles.set, styles.activeSet, { width: SET_COLUMNS.set }]}>{number}</AppText>
-        <AppText style={[styles.previous, { width: SET_COLUMNS.previous }]}>{previousLabel(entry)}</AppText>
-        <ScrubValue
-          value={formatKg(entry.kg)}
-          onStep={(steps) => onAdjust?.('kg', steps)}
-          accessibilityLabel="Peso em quilos"
-          style={styles.flex}
-        />
-        <ScrubValue
-          value={String(entry.reps)}
-          onStep={(steps) => onAdjust?.('reps', steps)}
-          accessibilityLabel="Repetições"
-          style={{ width: SET_COLUMNS.reps }}
-        />
-        <Pressable
-          onPress={() => {
-            haptics.press();
-            complete();
-          }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Concluir série ${number}`}
-        >
-          <Animated.View style={[styles.checkRing, ringStyle]} />
-        </Pressable>
-      </Animated.View>
-    </GestureDetector>
+    <View style={[styles.row, styles.active]} accessibilityLabel={`Série ${number}, em curso`}>
+      <AppText style={[styles.set, styles.activeSet, { width: SET_COLUMNS.set }]}>{number}</AppText>
+      <AppText style={[styles.previous, { width: SET_COLUMNS.previous }]}>{previousLabel(entry)}</AppText>
+      <NumberField
+        value={entry.kg}
+        format={formatKg}
+        decimals
+        onChange={(kg) => onSet?.('kg', kg)}
+        accessibilityLabel="Peso em quilos"
+        style={styles.flex}
+      />
+      <NumberField
+        value={entry.reps}
+        format={String}
+        decimals={false}
+        onChange={(reps) => onSet?.('reps', reps)}
+        accessibilityLabel="Repetições"
+        style={{ width: SET_COLUMNS.reps }}
+      />
+      {/* Status only — the set is logged with "Concluir série", never by tapping here. */}
+      <View style={styles.checkRing} accessibilityElementsHidden importantForAccessibility="no" />
+    </View>
   );
 }
 
@@ -154,9 +90,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.voltBorderSoft,
-    overflow: 'hidden',
   },
-  wash: { backgroundColor: colors.volt },
   flex: { flex: 1 },
   flexCenter: { flex: 1, textAlign: 'center' },
   center: { textAlign: 'center' },
