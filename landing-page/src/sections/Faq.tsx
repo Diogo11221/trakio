@@ -1,7 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import iconMinus from '../assets/figma/icon-minus.svg';
 import iconPlus from '../assets/figma/icon-plus.svg';
-import { Texture } from '../components/Texture';
 import { useRevealChildren } from '../hooks/useInView';
 import styles from './Faq.module.css';
 
@@ -37,7 +36,6 @@ export function Faq() {
 
   return (
     <section ref={section} className={styles.section} aria-labelledby={`${baseId}-title`}>
-      <Texture variant="chart" />
       <div className={styles.intro} data-reveal>
         <h2 id={`${baseId}-title`}>Perguntas frequentes</h2>
         <p>

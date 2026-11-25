@@ -1,3 +1,4 @@
+import { Backdrop } from './components/Backdrop';
 import { Grain } from './components/Grain';
 import { Nav } from './components/Nav';
 import { SmoothScrollProvider } from './hooks/SmoothScroll';
@@ -11,6 +12,7 @@ import { Showcase } from './sections/Showcase';
 export function App() {
   return (
     <SmoothScrollProvider>
+      <Backdrop />
       <Nav />
       <main>
         <Showcase />
