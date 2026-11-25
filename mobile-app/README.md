@@ -59,6 +59,26 @@ API do `backend-core` — troca-se esse ficheiro e os ecrãs ficam iguais.
   - `miguel@trakio.test` — aluno com PT
   - `rita@trakio.test` — PT
 
+## Dados guardados no telemóvel (antes do backend)
+
+Tudo o que a pessoa faz fica guardado por conta, em AsyncStorage (`lib/persist.ts`), com a forma que a
+API vai ter — trocar para o `backend-core` é trocar os providers, não os ecrãs.
+
+| O quê | Onde | Notas |
+| --- | --- | --- |
+| Treinos feitos | `features/workout/history.tsx` | séries reais, volume, recordes (carga máxima estimada) e sensação |
+| Treino a meio | `features/workout/store.tsx` | volta ao abrir a app ("Sair e continuar depois") |
+| Plano A · B · C | `features/workout/data.ts` | o próximo vem do histórico; cargas começam no que fizeste da última vez |
+| Diário alimentar | `features/nutrition/diary.tsx` | por dia; metas a partir do perfil (mesmas contas das calculadoras) |
+| Reconhecer refeições | `features/nutrition/foods.ts` | tabela local de ~45 alimentos + leitura de texto ("2 ovos, 150 g de frango e arroz") |
+| Peso | `features/progress/weight.tsx` | registar no Progresso atualiza o perfil |
+| Conversas PT ⇄ aluno | `state/chat.tsx` | partilhadas entre contas do mesmo telemóvel: o Miguel e a Rita (contas de teste) falam um com o outro |
+| Preferências | `state/settings.tsx` | vibração, alerta, som do descanso, Premium |
+| PT: planos, verificação, marketplace | `features/pt/store.tsx` | edições de planos guardadas; "Guardar e enviar" avisa o aluno no chat |
+
+A conta de teste do Miguel começa com 8 semanas de treinos, pesagens e um dia de refeições para o
+Progresso ter o que mostrar; contas novas começam vazias.
+
 ## Calculadoras
 
 Seis ferramentas partilhadas entre as duas apps (`features/tools`), com as fórmulas em `calc.ts`
@@ -97,6 +117,10 @@ Pagamentos (Premium, contratar PT) são sempre uma confirmação explícita com 
 
 ## Ainda por ligar
 
-- Dados são mock (`features/*/data.ts`) até existir API no `backend-core` / `backend-ai`.
+- Os dados ficam só no telemóvel (ver acima) até existir API no `backend-core` / `backend-ai`.
+- Fotos de refeições e voz precisam do `backend-ai`; por agora o registo lê texto (e o ditado do teclado).
+- Apple Health / relógio precisam de development build; a prontidão é calculada a partir dos treinos.
+- Videochamadas ainda não existem; combina-se pelo chat.
+- Alunos novos que contratam a Rita conversam com ela, mas ainda não aparecem na caixa da conta da Rita (precisa de backend).
 - Contas são locais (teste); Stripe e IA de refeições são simulados. Entrar com Apple/Google ainda não está ligado.
 - Live Activity no ecrã bloqueado (estado C do Figma) precisa de extensão nativa — por agora é uma notificação local.

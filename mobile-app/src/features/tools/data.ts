@@ -219,7 +219,7 @@ export function ageFrom(birthYear: number): number {
  * and the reference lift aren't asked in onboarding, so they start from
  * typical values the person can edit on each tool.
  */
-export function bodyFromProfile(profile: ClientProfile): BodyData {
+export function bodyFromProfile(profile: ClientProfile, lastLift?: BodyData['lift'] | null): BodyData {
   const male = profile.sex === 'male';
   return {
     sex: profile.sex,
@@ -232,6 +232,6 @@ export function bodyFromProfile(profile: ClientProfile): BodyData {
     activity: profile.activity,
     goal: profile.goal,
     trainingMinutes: profile.daysPerWeek > 0 ? 60 : 0,
-    lift: { exercise: 'Supino plano', weightKg: Math.max(20, Math.round((profile.weightKg * 0.7) / 2.5) * 2.5), reps: 8 },
+    lift: lastLift ?? { exercise: 'Supino plano', weightKg: Math.max(20, Math.round((profile.weightKg * 0.7) / 2.5) * 2.5), reps: 8 },
   };
 }

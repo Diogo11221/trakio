@@ -22,7 +22,7 @@ import { refreshMockData } from '@/lib/refresh';
 
 /** Cliente · Perfil e definições. */
 export default function Profile() {
-  const { vibration, setVibration, lockScreenAlert, setLockScreenAlert, premium, setPremium } = useSettings();
+  const { vibration, setVibration, lockScreenAlert, setLockScreenAlert, premium, setPremium, restSound, setRestSound } = useSettings();
   const [sheet, setSheet] = useState<'premium' | 'manage' | null>(null);
   const { reset } = useWorkout();
   const { account, signOut: endSession, deleteAccount } = useAuth();
@@ -43,6 +43,12 @@ export default function Profile() {
         },
       },
     ]);
+
+  const devicesInfo = () =>
+    Alert.alert(
+      'Relógio e Apple Health',
+      'A ligação ao Apple Health (sono, passos, frequência cardíaca) precisa da versão instalada da app — não funciona no Expo Go. Por agora, a prontidão é calculada a partir dos teus treinos.',
+    );
 
   const removeAccount = () =>
     Alert.alert('Apagar esta conta de teste?', 'O perfil e os dados guardados neste telemóvel são apagados. Não dá para desfazer.', [
@@ -97,17 +103,22 @@ export default function Profile() {
           <SectionLabel>O meu PT</SectionLabel>
         </Reveal>
         <Reveal index={4}>
-          {coached ? (
+          {coached && profile.trainer ? (
             <Card radius={16}>
               <CardRow style={styles.ptRow}>
-                <Portrait person="rita" size={36} />
+                <Portrait person={profile.trainer.id} size={36} />
                 <View style={styles.flex}>
-                  <AppText style={styles.ptName}>Rita Santos</AppText>
+                  <AppText style={styles.ptName}>{profile.trainer.name}</AppText>
                   <AppText variant="caption" tone="muted">
-                    Treino + Nutrição · 45€/mês
+                    {profile.trainer.pack} · {profile.trainer.price}€/{profile.trainer.period}
                   </AppText>
                 </View>
-                <PressableScale style={styles.message} accessibilityRole="button" accessibilityLabel="Mensagem à Rita">
+                <PressableScale
+                  onPress={() => router.push('/chat')}
+                  style={styles.message}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mensagem a ${profile.trainer.name}`}
+                >
                   <AppText style={styles.messageText}>Mensagem</AppText>
                 </PressableScale>
               </CardRow>
@@ -125,8 +136,8 @@ export default function Profile() {
         </Reveal>
         <Reveal index={6}>
           <Card radius={16}>
-            <SettingRow label="Apple Watch" value="Ligado" leading={<Icon name="dotGreen" size={8} />} />
-            <SettingRow label="Apple Health" value="há 5 min" leading={<Icon name="dotGreen" size={8} />} last />
+            <SettingRow label="Apple Watch" value="Por ligar" onPress={devicesInfo} />
+            <SettingRow label="Apple Health" value="Por ligar" onPress={devicesInfo} last />
           </Card>
         </Reveal>
 
@@ -136,7 +147,10 @@ export default function Profile() {
         <Reveal index={8}>
           <Card radius={16}>
             <SettingRow label="Calculadoras" value="Massa corporal, calorias…" onPress={() => router.push('/tools')} />
-            <SettingRow label="Som do fim do descanso" value="Plim" />
+            <SettingRow
+              label="Som do fim do descanso"
+              trailing={<Toggle value={restSound} onChange={setRestSound} accessibilityLabel="Som do fim do descanso" />}
+            />
             <SettingRow
               label="Vibração"
               trailing={<Toggle value={vibration} onChange={setVibration} accessibilityLabel="Vibração" />}
@@ -232,10 +246,10 @@ function SettingRow({
           {value}
         </AppText>
       ) : null}
-      {trailing ?? <Icon name="chevronRightFaint" size={14} />}
+      {trailing ?? (onPress ? <Icon name="chevronRightFaint" size={14} /> : null)}
     </CardRow>
   );
-  if (trailing) return content;
+  if (trailing || !onPress) return content;
   return (
     <PressableScale onPress={onPress} pressedScale={0.99} haptic="tick" accessibilityRole="button" accessibilityLabel={label}>
       {content}

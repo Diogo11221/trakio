@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
@@ -14,7 +14,6 @@ import { SectionHeader, StatStrip } from '@/features/pt/components';
 import { agenda, months, students } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
 import { formatToday, greeting } from '@/lib/format';
-import { haptics } from '@/lib/haptics';
 import { refreshMockData } from '@/lib/refresh';
 import { firstName, useTrainerProfile } from '@/state/auth';
 import { colors, fonts } from '@/theme/tokens';
@@ -114,7 +113,16 @@ export default function TrainerHome() {
                 {item.live ? (
                   <PressableScale
                     haptic="press"
-                    onPress={() => haptics.success()}
+                    onPress={() =>
+                      Alert.alert(
+                        'Videochamada',
+                        'As videochamadas chegam com o backend. Por agora, combina a chamada pelo chat.',
+                        [
+                          { text: 'Fechar', style: 'cancel' },
+                          { text: 'Abrir conversa', onPress: () => item.student && router.push({ pathname: '/pt/chat/[id]', params: { id: item.student } }) },
+                        ],
+                      )
+                    }
                     style={styles.join}
                     accessibilityRole="button"
                     accessibilityLabel="Entrar na videochamada"

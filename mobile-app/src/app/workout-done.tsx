@@ -17,7 +17,11 @@ import { Icon } from '@/components/Icon';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Screen';
 import { Card } from '@/components/Surface';
+import { recordsIn, sessionFromWorkout, useHistory } from '@/features/workout/history';
 import { useWorkout, workoutSummary, type WorkoutState } from '@/features/workout/store';
+import { decimal } from '@/features/tools/calc';
+import { useChat } from '@/state/chat';
+import { formatThousands } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { enterRise } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
@@ -33,7 +37,13 @@ const feelings: { value: NonNullable<WorkoutState['feeling']>; label: string }[]
 export default function WorkoutDone() {
   const insets = useSafeAreaInsets();
   const { state, setFeeling, reset } = useWorkout();
+  const { sessions, addSession } = useHistory();
+  const { sendToTrainer, trainerName } = useChat();
   const summary = workoutSummary(state);
+  const draft = sessionFromWorkout(state.plan, state.startedAt ?? 0, state.finishedAt ?? 0, state.feeling);
+  const records = recordsIn(sessions, draft.exercises);
+  const previous = sessions.find((s) => s.planId === state.plan.id && s.planId !== 'livre');
+  const volumeChange = previous && previous.volume > 0 ? Math.round(((draft.volume - previous.volume) / previous.volume) * 100) : null;
 
   // Check mark: ring pops in, then the tick lands with a heavy haptic.
   const ring = useSharedValue(0);
@@ -51,7 +61,36 @@ export default function WorkoutDone() {
     opacity: tick.get(),
   }));
 
+  const save = () => {
+    // Nothing logged (e.g. "Terminar treino" right away) → nothing to keep.
+    return draft.sets > 0 ? addSession(draft) : null;
+  };
+
   const close = () => {
+    save();
+    reset();
+    router.dismissTo('/today');
+  };
+
+  const sendSummary = () => {
+    const saved = save();
+    if (saved) {
+      const feeling = feelings.find((f) => f.value === saved.feeling)?.label;
+      sendToTrainer({
+        kind: 'workout',
+        title: `${saved.title} · ${saved.focus} concluído`,
+        detail: [
+          `${summary.minutes || 1} min`,
+          `${saved.sets} séries`,
+          `${formatThousands(saved.volume)} kg`,
+          saved.records.length > 0 ? `recorde: ${saved.records.join(', ')}` : null,
+          feeling ? `senti: ${feeling.toLowerCase()}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      });
+      haptics.success();
+    }
     reset();
     router.dismissTo('/today');
   };
@@ -81,23 +120,41 @@ export default function WorkoutDone() {
             <View style={styles.statDivider} />
             <Stat value={summary.sets} label="séries" />
             <View style={styles.statDivider} />
-            <Stat value={1} label="recorde novo" />
+            <Stat value={records.length} label={records.length === 1 ? 'recorde novo' : 'recordes novos'} />
           </Card>
         </Reveal>
 
-        <Reveal index={5} style={styles.stretch}>
-          <Card style={styles.record}>
-            <View style={styles.trophy}>
-              <Icon name="trophy" size={24} />
-            </View>
-            <View style={styles.flex}>
-              <AppText style={styles.recordTitle}>Novo recorde no supino inclinado</AppText>
-              <AppText variant="caption" tone="muted">
-                82,5 kg × 8 · carga máxima estimada 102 kg
-              </AppText>
-            </View>
-          </Card>
-        </Reveal>
+        {records[0] ? (
+          <Reveal index={5} style={styles.stretch}>
+            <Card style={styles.record}>
+              <View style={styles.trophy}>
+                <Icon name="trophy" size={24} />
+              </View>
+              <View style={styles.flex}>
+                <AppText style={styles.recordTitle}>
+                  Novo recorde: {records[0].name}
+                </AppText>
+                <AppText variant="caption" tone="muted">
+                  {decimal(records[0].kg, 1, true)} kg × {records[0].reps} · carga máxima estimada {Math.round(records[0].max)} kg
+                  {records.length > 1 ? ` · e mais ${records.length - 1}` : ''}
+                </AppText>
+              </View>
+            </Card>
+          </Reveal>
+        ) : volumeChange !== null ? (
+          <Reveal index={5} style={styles.stretch}>
+            <Card style={[styles.record, styles.recordQuiet]}>
+              <View style={styles.flex}>
+                <AppText style={styles.recordTitle}>
+                  {volumeChange >= 0 ? `Mais ${volumeChange}% de volume` : `${Math.abs(volumeChange)}% menos volume`} do que da última vez
+                </AppText>
+                <AppText variant="caption" tone="muted">
+                  {state.plan.title} anterior: {formatThousands(previous?.volume ?? 0)} kg
+                </AppText>
+              </View>
+            </Card>
+          </Reveal>
+        ) : null}
 
         <Reveal index={6} style={[styles.stretch, styles.effort]}>
           <AppText style={styles.effortTitle}>Como te sentiste?</AppText>
@@ -121,13 +178,13 @@ export default function WorkoutDone() {
             })}
           </View>
           <AppText variant="caption" tone="muted">
-            Ajuda a Rita e a IA a ajustar a próxima semana.
+            {trainerName ? `Ajuda ${trainerName.article} e a IA a ajustar a próxima semana.` : 'Ajuda a ajustar a próxima semana.'}
           </AppText>
         </Reveal>
       </View>
 
       <Animated.View entering={enterRise(560)} style={styles.bottom}>
-        <Button label="Enviar resumo à Rita" height={54} onPress={close} />
+        {trainerName ? <Button label={`Enviar resumo ${trainerName.to}`} height={54} onPress={sendSummary} /> : null}
         <Button label="Fechar" variant="ghost" height={46} onPress={close} />
       </Animated.View>
     </View>
@@ -206,6 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  recordQuiet: { borderColor: colors.border },
   recordTitle: { fontFamily: fonts.uiSemiBold, fontSize: 14, color: colors.text },
   effort: { gap: 10 },
   effortTitle: { fontFamily: fonts.uiSemiBold, fontSize: 15, color: colors.text },

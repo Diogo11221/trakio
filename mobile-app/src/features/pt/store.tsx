@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import type { Person } from '@/components/Portrait';
 import {
@@ -7,60 +7,89 @@ import {
   verificationSteps as initialSteps,
   type ChatMessage,
   type Conversation,
+  type PlanDay,
   type PlanSummary,
   type VerificationStep,
 } from '@/features/pt/data';
+import { accountKey, isRecord, usePersistentState } from '@/lib/persist';
+import { useAuth } from '@/state/auth';
+import { unreadFor, useChat } from '@/state/chat';
 
 type AiDecision = 'applied' | 'ignored';
 
+/** What the PT changes in the app — saved on the phone per account. */
 type TrainerState = {
-  conversations: Conversation[];
   marketplaceActive: boolean;
   aiDecisions: Partial<Record<Person, AiDecision>>;
   plans: PlanSummary[];
   steps: VerificationStep[];
   verificationSent: boolean;
+  /** Edited plan days, by plan id or "student:<id>" for a student's own plan. */
+  planDays: Record<string, PlanDay[]>;
 };
 
 type TrainerContextValue = TrainerState & {
+  /** Conversations with students, newest first (messages live in the shared chat store). */
+  conversations: Conversation[];
   sendMessage: (conversationId: Person, message: ChatMessage) => void;
   markRead: (conversationId: Person) => void;
   setMarketplaceActive: (active: boolean) => void;
   decideAi: (student: Person, decision: AiDecision) => void;
   addPlan: () => PlanSummary;
+  updatePlan: (id: string, patch: Partial<Omit<PlanSummary, 'id'>>) => void;
+  savePlanDays: (key: string, days: PlanDay[]) => void;
   completeStep: (stepId: string, status: string) => void;
   sendVerification: () => void;
 };
 
 const TrainerContext = createContext<TrainerContextValue | null>(null);
 
-export function TrainerProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<TrainerState>({
-    conversations: initialConversations,
+function initialState(): TrainerState {
+  return {
     marketplaceActive: true,
     aiDecisions: {},
     plans: initialPlans,
     steps: initialSteps,
     verificationSent: false,
-  });
+    planDays: {},
+  };
+}
+
+function parseState(raw: unknown): TrainerState | null {
+  if (!isRecord(raw) || !Array.isArray(raw.plans) || !Array.isArray(raw.steps)) return null;
+  return { ...initialState(), ...(raw as Partial<TrainerState>) };
+}
+
+export function TrainerProvider({ children }: { children: ReactNode }) {
+  const { account } = useAuth();
+  const { threads, send, markRead } = useChat();
+  const [state, setState] = usePersistentState(accountKey(account?.id, 'trainer'), initialState, parseState);
+
+  const conversations = useMemo<Conversation[]>(
+    () =>
+      initialConversations
+        .map((c) => {
+          const thread = threads[c.id];
+          const messages = thread?.messages ?? c.messages;
+          return {
+            ...c,
+            messages,
+            unread: unreadFor(thread, 'trainer'),
+            time: messages[messages.length - 1]?.time ?? c.time,
+            updatedAt: thread?.updatedAt ?? 0,
+          };
+        })
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map(({ updatedAt: _updatedAt, ...c }) => c),
+    [threads],
+  );
 
   const value = useMemo<TrainerContextValue>(
     () => ({
       ...state,
-      sendMessage: (conversationId, message) =>
-        setState((s) => {
-          const list = s.conversations.map((c) =>
-            c.id === conversationId ? { ...c, messages: [...c.messages, message], time: message.time, unread: 0 } : c,
-          );
-          // The conversation you just wrote to moves to the top of the list.
-          const sent = list.find((c) => c.id === conversationId);
-          return { ...s, conversations: sent ? [sent, ...list.filter((c) => c.id !== conversationId)] : list };
-        }),
-      markRead: (conversationId) =>
-        setState((s) => ({
-          ...s,
-          conversations: s.conversations.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)),
-        })),
+      conversations,
+      sendMessage: (conversationId, message) => send(conversationId, message, 'trainer'),
+      markRead: (conversationId) => markRead(conversationId, 'trainer'),
       setMarketplaceActive: (marketplaceActive) => setState((s) => ({ ...s, marketplaceActive })),
       decideAi: (student, decision) =>
         setState((s) => ({ ...s, aiDecisions: { ...s.aiDecisions, [student]: decision } })),
@@ -74,6 +103,9 @@ export function TrainerProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, plans: [plan, ...s.plans] }));
         return plan;
       },
+      updatePlan: (id, patch) =>
+        setState((s) => ({ ...s, plans: s.plans.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
+      savePlanDays: (key, days) => setState((s) => ({ ...s, planDays: { ...s.planDays, [key]: days } })),
       completeStep: (stepId, status) =>
         setState((s) => ({
           ...s,
@@ -81,7 +113,7 @@ export function TrainerProvider({ children }: { children: ReactNode }) {
         })),
       sendVerification: () => setState((s) => ({ ...s, verificationSent: true })),
     }),
-    [state],
+    [conversations, markRead, send, setState, state],
   );
 
   return <TrainerContext.Provider value={value}>{children}</TrainerContext.Provider>;

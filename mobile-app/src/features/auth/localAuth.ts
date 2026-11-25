@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 
-import { AuthError, type Account, type Profile, type PublicAccount, type Role } from '@/features/auth/types';
+import { AuthError, demoTrainerLink, type Account, type Profile, type PublicAccount, type Role } from '@/features/auth/types';
 
 /**
  * Test accounts kept on this phone (AsyncStorage) until backend-core exposes
@@ -64,6 +64,7 @@ async function demoAccounts(): Promise<Account[]> {
         daysPerWeek: 4,
         experience: 'some',
         coached: true,
+        trainer: demoTrainerLink,
       },
     },
     {

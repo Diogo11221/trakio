@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
 
@@ -14,21 +14,58 @@ import { PressableScale } from '@/components/PressableScale';
 import { ProgressRing, useRingSweep } from '@/components/ProgressRing';
 import { Reveal, Screen } from '@/components/Screen';
 import { Card } from '@/components/Surface';
-import { useWorkout } from '@/features/workout/store';
+import { goalsFor, mealTotals, useDiary } from '@/features/nutrition/diary';
+import { templateFor } from '@/features/workout/data';
+import { nextPlanId, sameDay, useHistory, type Session } from '@/features/workout/history';
+import { useStartWorkout } from '@/features/workout/useStartWorkout';
+import { dayKey } from '@/lib/persist';
+import { useChat } from '@/state/chat';
 import { formatThousands, formatToday, greeting } from '@/lib/format';
 import { colors, fonts, springs } from '@/theme/tokens';
 import { refreshMockData } from '@/lib/refresh';
 import { firstName, useClientProfile } from '@/state/auth';
 
-const readiness = 78;
-const kcal = { eaten: 1361, goal: 2400 };
+const day = 24 * 3600 * 1000;
+
+/**
+ * Readiness from training load until the watch data (HealthKit) is wired:
+ * rest days push it up, a hard session yesterday pulls it down.
+ */
+function readinessFrom(sessions: Session[], now: number): { value: number; note: string } {
+  const last = sessions[0];
+  if (!last) return { value: 85, note: 'Ainda sem treinos · começa com calma' };
+  const daysSince = Math.floor((now - last.finishedAt) / day);
+  let value = 80;
+  if (last.feeling === 'max') value -= 16;
+  else if (last.feeling === 'hard') value -= 8;
+  if (daysSince === 0) value -= 12;
+  else if (daysSince === 1) value -= 4;
+  else if (daysSince >= 3) value += 6;
+  const recent = sessions.filter((s) => now - s.finishedAt < 7 * day).length;
+  if (recent >= 5) value -= 8;
+  value = Math.max(30, Math.min(98, value));
+  const when = daysSince === 0 ? 'Treinaste hoje' : daysSince === 1 ? 'Último treino ontem' : `Último treino há ${daysSince} dias`;
+  const verdict = value >= 75 ? 'pronto para carga' : value >= 55 ? 'treina sem forçar' : 'dia para descansar';
+  return { value, note: `${when} · ${verdict}` };
+}
 
 /** Cliente · Hoje. */
 export default function Today() {
-  const { start } = useWorkout();
-  const now = new Date();
+  const [now] = useState(() => new Date());
   const profile = useClientProfile();
-  const ring = useRingSweep(kcal.eaten / kcal.goal, 300);
+  const { sessions } = useHistory();
+  const { mealsOn } = useDiary();
+  const { threads, clientThreadId, trainerName } = useChat();
+  const { startPlan, resume, inProgress, current } = useStartWorkout();
+
+  const readiness = readinessFrom(sessions, now.getTime());
+  const doneToday = sessions.find((s) => sameDay(s.finishedAt, now.getTime()));
+  const plan = templateFor(nextPlanId(sessions))!;
+  const eaten = mealTotals(mealsOn(dayKey(now)));
+  const goal = goalsFor(profile);
+  const ring = useRingSweep(Math.min(1, eaten.kcal / goal.kcal), 300);
+  const thread = clientThreadId ? threads[clientThreadId] : undefined;
+  const lastFromPt = thread ? [...thread.messages].reverse().find((m) => m.from === 'me') : undefined;
 
   return (
     <Screen gap={18} onRefresh={refreshMockData}>
@@ -53,15 +90,15 @@ export default function Today() {
               <AppText variant="overline" tone="muted">
                 Prontidão para treinar
               </AppText>
-              <AppText style={styles.readinessValue}>{readiness}</AppText>
+              <AppText style={styles.readinessValue}>{readiness.value}</AppText>
               <AppText variant="numberSmall" tone="muted">
                 / 100
               </AppText>
             </View>
-            <ReadinessMeter value={readiness} />
+            <ReadinessMeter value={readiness.value} />
           </View>
           <AppText variant="small" tone="muted">
-            Dormiste 7h12 · pronto para carga
+            {readiness.note}
           </AppText>
         </Card>
       </Reveal>
@@ -82,14 +119,18 @@ export default function Today() {
           />
           <View style={styles.todayText}>
             <AppText variant="overline" tone="muted">
-              Treino de hoje
+              {inProgress ? 'Treino a meio' : doneToday ? 'Feito hoje' : 'Treino de hoje'}
             </AppText>
-            <AppText variant="heading">Treino A · Peito</AppText>
+            <AppText variant="heading">
+              {inProgress ? `${current.title} · ${current.focus}` : doneToday ? `${doneToday.title} · ${doneToday.focus}` : `${plan.title} · ${plan.focus}`}
+            </AppText>
             <AppText variant="small" tone="muted">
-              6 exercícios · ~55 min
+              {doneToday && !inProgress
+                ? `${Math.max(1, Math.round((doneToday.finishedAt - doneToday.startedAt) / 60000))} min · ${doneToday.sets} séries · ${formatThousands(doneToday.volume)} kg`
+                : `${plan.exercises.length} exercícios · ~${plan.estimatedMinutes} min`}
             </AppText>
             <View style={styles.tags}>
-              {['Peito', 'Ombros', 'Tríceps'].map((tag) => (
+              {(doneToday && !inProgress ? [] : plan.muscles).map((tag) => (
                 <View key={tag} style={styles.tag}>
                   <AppText variant="overline" tone="muted">
                     {tag}
@@ -100,14 +141,12 @@ export default function Today() {
           </View>
           <View style={styles.ctaGap} />
           <Button
-            label="Começar treino"
+            label={inProgress ? 'Continuar treino' : doneToday ? `Fazer o ${plan.title}` : 'Começar treino'}
+            variant={doneToday && !inProgress ? 'outline' : 'primary'}
             icon="arrowRight"
             height={50}
             style={styles.cta}
-            onPress={() => {
-              start();
-              router.push('/workout');
-            }}
+            onPress={() => (inProgress ? resume() : startPlan(plan.id))}
           />
         </Card>
       </Reveal>
@@ -118,13 +157,15 @@ export default function Today() {
             <ProgressRing size={44} strokeWidth={5} progress={ring} color={colors.text} trackColor={colors.border} />
             <View style={styles.nutritionText}>
               <View style={styles.baseline}>
-                <AppText style={styles.kcal}>{kcal.eaten}</AppText>
+                <AppText style={styles.kcal}>{formatThousands(eaten.kcal)}</AppText>
                 <AppText variant="numberSmall" tone="muted" style={styles.kcalGoal}>
-                  / {formatThousands(kcal.goal)} kcal
+                  / {formatThousands(goal.kcal)} kcal
                 </AppText>
               </View>
               <AppText variant="caption" tone="muted" style={styles.macros}>
-                Proteína 112 g · Hidratos 140 g · Gordura 34 g
+                {eaten.kcal === 0
+                  ? 'Ainda sem refeições hoje'
+                  : `Proteína ${eaten.protein} g · Hidratos ${eaten.carbs} g · Gordura ${eaten.fat} g`}
               </AppText>
             </View>
             <Icon name="chevronRight" size={16} />
@@ -132,22 +173,34 @@ export default function Today() {
         </PressableScale>
       </Reveal>
 
-      <Reveal index={4}>
-        <Card style={styles.message}>
-          <Portrait person="rita" size={36} />
-          <View style={styles.messageText}>
-            <View style={styles.messageTop}>
-              <AppText style={styles.messageFrom}>Rita Santos · PT</AppText>
-              <AppText variant="numberSmall" tone="muted">
-                08:14
-              </AppText>
-            </View>
-            <AppText variant="small" tone="muted" style={styles.messageBody}>
-              Boa semana! Se o supino te parecer fácil, sobe 2,5 kg.
-            </AppText>
-          </View>
-        </Card>
-      </Reveal>
+      {trainerName ? (
+        <Reveal index={4}>
+          <PressableScale onPress={() => router.push('/chat')} accessibilityLabel={`Conversa com ${trainerName.name}`}>
+            <Card style={styles.message}>
+              <Portrait person={trainerName.id} size={36} />
+              <View style={styles.messageText}>
+                <View style={styles.messageTop}>
+                  <AppText style={styles.messageFrom}>{trainerName.name} · PT</AppText>
+                  {lastFromPt ? (
+                    <AppText variant="numberSmall" tone="muted">
+                      {lastFromPt.time}
+                    </AppText>
+                  ) : null}
+                </View>
+                <AppText variant="small" tone="muted" style={styles.messageBody} numberOfLines={2}>
+                  {!lastFromPt
+                    ? `Escreve ${trainerName.to} — dúvidas, fotos da refeição, como correu o treino.`
+                    : lastFromPt.kind === 'text'
+                      ? lastFromPt.text
+                      : lastFromPt.kind === 'file'
+                        ? `Enviou ${lastFromPt.name}`
+                        : 'Enviou uma foto'}
+                </AppText>
+              </View>
+            </Card>
+          </PressableScale>
+        </Reveal>
+      ) : null}
     </Screen>
   );
 }

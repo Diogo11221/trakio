@@ -14,6 +14,7 @@ import { Sheet } from '@/components/Sheet';
 import { Card, IconButton, SectionLabel } from '@/components/Surface';
 import { trainers, type Package, type Trainer } from '@/features/marketplace/data';
 import { haptics } from '@/lib/haptics';
+import { useAuth } from '@/state/auth';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
 
 function priceLabel(pkg: Package) {
@@ -28,6 +29,7 @@ export default function TrainerProfile() {
   const [packageId, setPackageId] = useState(trainer.packages[0].id);
   const [confirming, setConfirming] = useState(false);
   const selected = trainer.packages.find((p) => p.id === packageId) ?? trainer.packages[0];
+  const { account, saveProfile } = useAuth();
 
   return (
     <View style={styles.root}>
@@ -126,9 +128,26 @@ export default function TrainerProfile() {
         trainer={trainer}
         pkg={selected}
         onClose={() => setConfirming(false)}
-        onHired={() => {
+        onHired={async () => {
           setConfirming(false);
-          router.back();
+          // Stripe isn't wired: hiring links the PT to this test account.
+          if (account?.profile?.kind === 'client') {
+            await saveProfile({
+              ...account.profile,
+              coached: true,
+              trainer: {
+                id: trainer.id,
+                name: trainer.name,
+                article: trainer.article,
+                pack: selected.name,
+                price: selected.price,
+                period: selected.period,
+              },
+            });
+            router.replace('/chat');
+          } else {
+            router.back();
+          }
         }}
       />
     </View>

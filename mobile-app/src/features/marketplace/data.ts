@@ -10,6 +10,8 @@ export type Package = { id: string; name: string; description: string; price: nu
 export type Trainer = {
   id: Person;
   name: string;
+  /** Article used in copy ("a Rita", "o Tiago") — authored with the profile, never guessed. */
+  article: 'a' | 'o';
   verified: boolean;
   specialties: string;
   tags: Specialty[];
@@ -33,6 +35,7 @@ export const trainers: Trainer[] = [
   {
     id: 'rita',
     name: 'Rita Santos',
+    article: 'a',
     verified: true,
     specialties: 'Hipertrofia · Força',
     tags: ['Hipertrofia', 'Força'],
@@ -48,6 +51,7 @@ export const trainers: Trainer[] = [
   {
     id: 'tiago',
     name: 'Tiago Ferreira',
+    article: 'o',
     verified: true,
     specialties: 'Perda de peso · Nutrição',
     tags: ['Perda de peso'],
@@ -66,6 +70,7 @@ export const trainers: Trainer[] = [
   {
     id: 'ines',
     name: 'Inês Almeida',
+    article: 'a',
     verified: false,
     specialties: 'Mobilidade · Pós-parto',
     tags: ['Mobilidade'],
@@ -84,6 +89,7 @@ export const trainers: Trainer[] = [
   {
     id: 'bruno',
     name: 'Bruno Lopes',
+    article: 'o',
     verified: true,
     specialties: 'Powerlifting',
     tags: ['Força', 'Powerlifting'],

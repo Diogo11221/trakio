@@ -11,7 +11,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { IntroOverlay } from '@/components/IntroOverlay';
 import { WorkoutProvider } from '@/features/workout/store';
+import { DiaryProvider } from '@/features/nutrition/diary';
+import { WeightProvider } from '@/features/progress/weight';
+import { HistoryProvider } from '@/features/workout/history';
 import { AuthProvider } from '@/state/auth';
+import { ChatProvider } from '@/state/chat';
 import { SettingsProvider } from '@/state/settings';
 import { colors } from '@/theme/tokens';
 
@@ -45,36 +49,45 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <AuthProvider>
           <SettingsProvider>
-            <WorkoutProvider>
-              <StatusBar style="light" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.bg },
-                  animation: 'slide_from_right',
-                }}
-              >
-                <Stack.Screen name="index" options={{ animation: 'none' }} />
-                <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-                <Stack.Screen name="sign-in" />
-                <Stack.Screen name="sign-up" />
-                <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
-                <Stack.Screen name="edit-profile" />
-                <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
-                <Stack.Screen
-                  name="workout"
-                  options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
-                />
-                <Stack.Screen name="workout-done" options={{ animation: 'fade', gestureEnabled: false }} />
-                <Stack.Screen name="meal-log" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="trainers/index" />
-                <Stack.Screen name="trainers/[id]" />
-                <Stack.Screen name="tools/index" />
-                <Stack.Screen name="tools/[id]" />
-                <Stack.Screen name="pt" options={{ animation: 'fade', gestureEnabled: false }} />
-              </Stack>
-              <IntroOverlay />
-            </WorkoutProvider>
+            <ChatProvider>
+              <HistoryProvider>
+                <DiaryProvider>
+                  <WeightProvider>
+                    <WorkoutProvider>
+                      <StatusBar style="light" />
+                      <Stack
+                        screenOptions={{
+                          headerShown: false,
+                          contentStyle: { backgroundColor: colors.bg },
+                          animation: 'slide_from_right',
+                        }}
+                      >
+                        <Stack.Screen name="index" options={{ animation: 'none' }} />
+                        <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+                        <Stack.Screen name="sign-in" />
+                        <Stack.Screen name="sign-up" />
+                        <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
+                        <Stack.Screen name="edit-profile" />
+                        <Stack.Screen name="chat" />
+                        <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
+                        <Stack.Screen
+                          name="workout"
+                          options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
+                        />
+                        <Stack.Screen name="workout-done" options={{ animation: 'fade', gestureEnabled: false }} />
+                        <Stack.Screen name="meal-log" options={{ presentation: 'modal' }} />
+                        <Stack.Screen name="trainers/index" />
+                        <Stack.Screen name="trainers/[id]" />
+                        <Stack.Screen name="tools/index" />
+                        <Stack.Screen name="tools/[id]" />
+                        <Stack.Screen name="pt" options={{ animation: 'fade', gestureEnabled: false }} />
+                      </Stack>
+                      <IntroOverlay />
+                    </WorkoutProvider>
+                  </WeightProvider>
+                </DiaryProvider>
+              </HistoryProvider>
+            </ChatProvider>
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>

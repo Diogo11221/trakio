@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import * as localAuth from '@/features/auth/localAuth';
-import type { ClientProfile, Profile, PublicAccount, Role, TrainerProfile } from '@/features/auth/types';
+import { demoTrainerLink, type ClientProfile, type Profile, type PublicAccount, type Role, type TrainerProfile } from '@/features/auth/types';
 
 type AuthState = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: PublicAccount };
 
@@ -92,6 +92,7 @@ const fallbackClient: ClientProfile = {
   daysPerWeek: 4,
   experience: 'some',
   coached: true,
+  trainer: demoTrainerLink,
 };
 
 const fallbackTrainer: TrainerProfile = {

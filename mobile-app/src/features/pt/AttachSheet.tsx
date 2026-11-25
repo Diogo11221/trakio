@@ -14,10 +14,14 @@ export type Attachment =
   | { kind: 'file'; name: string; meta: string }
   | { kind: 'workout'; title: string; detail: string };
 
+export type AttachSource = 'camera' | 'photos' | 'file' | 'workout';
+
 type AttachSheetProps = {
   visible: boolean;
   onClose: () => void;
   onAttach: (attachment: Attachment) => void;
+  /** Which options to offer (students can't send workout cards). */
+  sources?: AttachSource[];
 };
 
 function sizeLabel(bytes: number | undefined): string {
@@ -26,8 +30,8 @@ function sizeLabel(bytes: number | undefined): string {
 }
 
 /** PT · Mensagens · anexar — camera, photos, file or a workout card. */
-export function AttachSheet({ visible, onClose, onAttach }: AttachSheetProps) {
-  const pick = async (source: 'camera' | 'photos' | 'file' | 'workout') => {
+export function AttachSheet({ visible, onClose, onAttach, sources }: AttachSheetProps) {
+  const pick = async (source: AttachSource) => {
     if (source === 'workout') {
       onAttach({ kind: 'workout', title: 'Treino B · Costas', detail: '6 exercícios · ~50 min · toca para abrir' });
       return;
@@ -51,7 +55,7 @@ export function AttachSheet({ visible, onClose, onAttach }: AttachSheetProps) {
     onAttach({ kind: 'photo', uri: result.assets[0].uri });
   };
 
-  const options: { id: 'camera' | 'photos' | 'file' | 'workout'; label: string; icon: IconName }[] = [
+  const allOptions: { id: AttachSource; label: string; icon: IconName }[] = [
     { id: 'camera', label: 'Câmara', icon: 'attachCamera' },
     { id: 'photos', label: 'Fotografias', icon: 'attachPhotos' },
     { id: 'file', label: 'Ficheiro', icon: 'attachFile' },
@@ -66,7 +70,7 @@ export function AttachSheet({ visible, onClose, onAttach }: AttachSheetProps) {
       header={<AppText variant="subheading">Enviar</AppText>}
     >
       <View style={styles.options}>
-        {options.map((option) => (
+        {allOptions.filter((o) => !sources || sources.includes(o.id)).map((option) => (
           <PressableScale
             key={option.id}
             wrapperStyle={styles.flex}
