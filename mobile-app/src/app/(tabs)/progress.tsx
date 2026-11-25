@@ -10,8 +10,9 @@ import { Reveal, Screen } from '@/components/Screen';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { Card, CardRow, SectionLabel } from '@/components/Surface';
 import { ToolGrid } from '@/features/tools/components';
-import { clientBody } from '@/features/tools/data';
+import { bodyFromProfile } from '@/features/tools/data';
 import { refreshMockData } from '@/lib/refresh';
+import { useClientProfile } from '@/state/auth';
 import { colors, fonts } from '@/theme/tokens';
 
 const ranges = [
@@ -40,6 +41,7 @@ const lifts: { name: string; change: string | null; stalled?: string; sparkline:
 /** Cliente · Progresso. */
 export default function Progress() {
   const [range, setRange] = useState<Range>('2m');
+  const profile = useClientProfile();
 
   return (
     <Screen gap={16} onRefresh={refreshMockData}>
@@ -93,7 +95,7 @@ export default function Progress() {
         <SectionLabel>Ferramentas</SectionLabel>
       </Reveal>
       <Reveal index={5}>
-        <ToolGrid body={clientBody} onOpen={(id) => router.push({ pathname: '/tools/[id]', params: { id } })} />
+        <ToolGrid body={bodyFromProfile(profile)} onOpen={(id) => router.push({ pathname: '/tools/[id]', params: { id } })} />
       </Reveal>
     </Screen>
   );

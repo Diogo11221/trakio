@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
+import { Avatar } from '@/components/Avatar';
 import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
@@ -15,11 +16,13 @@ import { useTrainer } from '@/features/pt/store';
 import { formatToday, greeting } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { refreshMockData } from '@/lib/refresh';
+import { firstName, useTrainerProfile } from '@/state/auth';
 import { colors, fonts } from '@/theme/tokens';
 
 /** PT · Início. */
 export default function TrainerHome() {
   const now = new Date();
+  const profile = useTrainerProfile();
   const { aiDecisions } = useTrainer();
   const [accountOpen, setAccountOpen] = useState(false);
   // Once the trainer acts on an AI suggestion, the student leaves this list.
@@ -33,10 +36,12 @@ export default function TrainerHome() {
             <AppText variant="small" tone="muted">
               {formatToday(now)}
             </AppText>
-            <AppText variant="title">{greeting(now)}, Rita</AppText>
+            <AppText variant="title">
+              {greeting(now)}, {firstName(profile.name)}
+            </AppText>
           </View>
           <PressableScale onPress={() => setAccountOpen(true)} accessibilityLabel="Conta">
-            <Portrait person="rita" size={42} />
+            <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={42} name={profile.name} />
           </PressableScale>
         </Reveal>
 
