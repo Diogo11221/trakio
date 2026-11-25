@@ -1,0 +1,34 @@
+/* Trakio design tokens — mirrors the "Trakio Tokens" variables in Figma. */
+:root {
+  /* Dark (landing, mobile) */
+  --color-bg: #0b0c0e;
+  --color-surface: #14161a;
+  --color-surface-raised: #1c1f25;
+  --color-surface-pop: #16181d;
+  --color-input: #0f1114;
+  --color-border: #23262e;
+  --color-border-strong: #2e323b;
+  --color-text: #f4f5f7;
+  --color-text-soft: #c7ccd4;
+  --color-text-muted: #8e95a2;
+  --color-volt: #d4ff00;
+  --color-viewport-3d: #141819;
+
+  /* Light (PT dashboard) */
+  --color-light-bg: #f6f7f9;
+  --color-light-surface: #ffffff;
+  --color-light-border: #e2e5ec;
+  --color-light-text: #111318;
+  --color-light-text-muted: #5e6573;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --page-max: 1440px;
+  --page-gutter: clamp(20px, 5.6vw, 80px);
+  --nav-height: 72px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
