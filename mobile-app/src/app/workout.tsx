@@ -99,12 +99,17 @@ export default function Workout() {
   // you are; coming back clears it.
   const { plan, currentId } = state;
   useEffect(() => {
+    let posted = false;
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active') {
+        posted = false;
         clearWorkoutStatus();
         return;
       }
-      if (next !== 'background' || state.finishedAt) return;
+      // Post on the way out ("inactive" comes first on iOS): by the time
+      // "background" arrives JS may already be suspended.
+      if (posted || state.finishedAt) return;
+      posted = true;
       const exercise = plan.exercises.find((e) => e.id === currentId);
       if (!exercise) return;
       const index = activeSetIndex(exercise);

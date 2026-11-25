@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { formatKg } from '@/lib/format';
 
@@ -9,13 +9,12 @@ let scheduledId: string | null = null;
 let prepared = false;
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    // Show the banner even with the app open; the in-app "plim" covers the sound.
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async () => {
+    // Notifications are for when you're outside the app — inside it, the
+    // screen, the plim and the vibration already tell you everything.
+    const outside = AppState.currentState !== 'active';
+    return { shouldShowBanner: outside, shouldShowList: outside, shouldPlaySound: outside, shouldSetBadge: false };
+  },
 });
 
 /** Asks once, when the first workout starts — not on app launch. */
@@ -31,8 +30,12 @@ export async function prepareRestAlerts(): Promise<boolean> {
   }
   prepared = true;
   const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
+  if (current.granted) {
+    if (__DEV__) console.log('[trakio] notifications: allowed');
+    return true;
+  }
   const requested = await Notifications.requestPermissionsAsync();
+  if (__DEV__) console.log(`[trakio] notifications: ${requested.granted ? 'allowed' : 'DENIED'} (asked now)`);
   return requested.granted;
 }
 
@@ -89,6 +92,7 @@ export type WorkoutStatus = {
  */
 export async function showWorkoutStatus(status: WorkoutStatus): Promise<void> {
   if (Platform.OS === 'web') return;
+  if (__DEV__) console.log(`[trakio] status notification: ${status.title}`);
   await Notifications.scheduleNotificationAsync({
     identifier: STATUS_ID,
     content: {
