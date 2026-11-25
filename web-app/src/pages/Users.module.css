@@ -1,0 +1,31 @@
+.tableCard {
+  overflow: visible;
+}
+.type {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.typePt {
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px 12px 20px;
+  border-top: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}

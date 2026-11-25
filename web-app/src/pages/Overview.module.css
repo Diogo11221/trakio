@@ -1,0 +1,236 @@
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 24px;
+  align-items: stretch;
+}
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cardTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.cardSub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swatchDark,
+.swatchVolt {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.swatchDark {
+  background: var(--color-text);
+}
+.swatchVolt {
+  background: var(--color-volt);
+}
+
+.chartCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  min-height: 440px;
+}
+.bars {
+  flex: 1;
+  display: flex;
+  gap: 28px;
+  padding-top: 10px;
+  min-height: 300px;
+}
+.barCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.barValue {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.barValueLast {
+  color: var(--color-text);
+}
+.barTrack {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.bar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: height 700ms var(--ease-out);
+}
+.barSubs {
+  min-height: 4px;
+  background: var(--color-volt);
+  border-radius: 4px 4px 0 0;
+}
+.barFees {
+  background: var(--color-bar);
+  border-radius: 0 0 4px 4px;
+  transition: background-color 160ms var(--ease-out);
+}
+.barCol:hover .barFees {
+  background: #a9afb9;
+}
+.barFeesLast,
+.barCol:hover .barFeesLast {
+  background: var(--color-text);
+}
+.barMonth {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-text);
+  color: var(--color-surface);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: tip 140ms var(--ease-out);
+}
+@keyframes tip {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+}
+
+.aiCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+}
+.aiStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+.aiStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aiValue {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 20px;
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 22px;
+}
+.reviewHead {
+  padding-bottom: 8px;
+}
+.reviewItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  transition: background-color 160ms var(--ease-out);
+}
+.reviewItem:hover,
+.reviewHot {
+  background: var(--color-bg);
+}
+.reviewIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.reviewText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.reviewTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+.count {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--color-bg);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 12px;
+}
+.reviewItem:hover .count {
+  background: var(--color-surface);
+}
+.countHot,
+.reviewItem:hover .countHot {
+  background: var(--color-volt);
+}
+.cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  border-radius: var(--radius-lg);
+  background: var(--color-text);
+  color: var(--color-surface);
+  font-weight: 600;
+  transition:
+    background-color 160ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+.cta:hover {
+  background: #24272e;
+}
+.cta:active {
+  transform: scale(0.98);
+}
