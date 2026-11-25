@@ -9,12 +9,13 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { IntroOverlay } from '@/components/IntroOverlay';
 import { WorkoutProvider } from '@/features/workout/store';
 import { SettingsProvider } from '@/state/settings';
 import { colors } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
-SplashScreen.setOptions({ duration: 400, fade: true });
+SplashScreen.setOptions({ duration: 200, fade: true });
 
 const navigationTheme = {
   ...DarkTheme,
@@ -64,6 +65,7 @@ export default function RootLayout() {
               <Stack.Screen name="trainers/index" />
               <Stack.Screen name="trainers/[id]" />
             </Stack>
+            <IntroOverlay />
           </WorkoutProvider>
         </SettingsProvider>
       </ThemeProvider>
