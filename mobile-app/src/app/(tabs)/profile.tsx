@@ -85,6 +85,7 @@ export default function Profile() {
         </Reveal>
         <Reveal index={6}>
           <Card radius={16}>
+            <SettingRow label="Calculadoras" value="Massa corporal, calorias…" onPress={() => router.push('/tools')} />
             <SettingRow label="Som do fim do descanso" value="Plim" />
             <SettingRow
               label="Vibração"

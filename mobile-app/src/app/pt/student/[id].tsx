@@ -14,9 +14,11 @@ import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { IconButton } from '@/components/Surface';
-import { StatStrip } from '@/features/pt/components';
+import { SectionHeader, StatStrip } from '@/features/pt/components';
 import { students } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
+import { ToolGrid } from '@/features/tools/components';
+import { studentBodies } from '@/features/tools/data';
 import { haptics } from '@/lib/haptics';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
@@ -31,6 +33,8 @@ export default function StudentDetail() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const stats = student.stats;
+  const body = studentBodies[student.id];
+  const openTools = () => router.push({ pathname: '/pt/tools', params: { student: student.id } });
   const openChat = () => router.push({ pathname: '/pt/chat/[id]', params: { id: student.id } });
   const openPlan = () =>
     router.push({ pathname: '/pt/plan/[id]', params: { id: student.goal.toLowerCase(), student: student.id } });
@@ -136,6 +140,21 @@ export default function StudentDetail() {
             />
           </Reveal>
         </Animated.View>
+
+        {body ? (
+          <Animated.View layout={layoutGlide} style={styles.tools}>
+            <Reveal index={4}>
+              <SectionHeader title="Medidas e cálculos" action="Ver todos" onAction={openTools} />
+            </Reveal>
+            <Reveal index={5}>
+              <ToolGrid
+                body={body}
+                tools={['body-mass', 'body-fat', 'calories', 'max-lift']}
+                onOpen={(tool) => router.push({ pathname: '/pt/tools/[id]', params: { id: tool, student: student.id } })}
+              />
+            </Reveal>
+          </Animated.View>
+        ) : null}
       </ScrollView>
 
       <LinearGradient
@@ -160,6 +179,7 @@ export default function StudentDetail() {
         <View style={styles.options}>
           <Button label="Enviar mensagem" variant="outline" height={50} onPress={() => { setMoreOpen(false); openChat(); }} />
           <Button label="Editar plano" variant="outline" height={50} onPress={() => { setMoreOpen(false); openPlan(); }} />
+          <Button label="Calculadoras" variant="outline" height={50} onPress={() => { setMoreOpen(false); openTools(); }} />
           <Button
             label="Terminar acompanhamento"
             variant="ghost"
@@ -194,6 +214,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: pagePadding, gap: 16 },
   flex: { flex: 1, gap: 3 },
   top: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: -4 },
+  tools: { gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   name: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.48, color: colors.text },
   change: { fontFamily: fonts.uiMedium, fontSize: 10, color: colors.volt },

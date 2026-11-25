@@ -64,6 +64,8 @@ export default function RootLayout() {
               <Stack.Screen name="meal-log" options={{ presentation: 'modal' }} />
               <Stack.Screen name="trainers/index" />
               <Stack.Screen name="trainers/[id]" />
+              <Stack.Screen name="tools/index" />
+              <Stack.Screen name="tools/[id]" />
               <Stack.Screen name="pt" options={{ animation: 'fade', gestureEnabled: false }} />
             </Stack>
             <IntroOverlay />

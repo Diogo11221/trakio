@@ -1,0 +1,16 @@
+import { Redirect, useLocalSearchParams } from 'expo-router';
+
+import { clientBody, isToolId, toolInfo } from '@/features/tools/data';
+import { ToolScreen } from '@/features/tools/ToolScreen';
+import { ToolView } from '@/features/tools/views';
+
+/** Cliente · uma calculadora. */
+export default function Tool() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  if (!isToolId(id)) return <Redirect href="/tools" />;
+  return (
+    <ToolScreen title={toolInfo[id].title} description={toolInfo[id].description}>
+      <ToolView tool={id} initial={clientBody} />
+    </ToolScreen>
+  );
+}

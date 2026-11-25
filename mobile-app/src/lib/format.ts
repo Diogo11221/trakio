@@ -18,6 +18,11 @@ export function formatClock(totalSeconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+/** Wall-clock time for chat bubbles: "14:05". */
+export function formatTimeOfDay(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 const weekday = new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
 
 /** "Terça, 24 de novembro" */
