@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { enterRise } from '@/theme/motion';
 import { colors, pagePadding } from '@/theme/tokens';
 
 type ScreenProps = {
@@ -40,7 +41,7 @@ export function Screen({ children, gap = 16, bottomInset = 24, scroll = true, co
   );
 }
 
-/** Staggered entrance for stacked sections — calm fade + rise, ~60 ms apart. */
+/** Staggered entrance for stacked sections — calm fade + 12 pt rise, 50 ms apart. */
 export function Reveal({
   index = 0,
   children,
@@ -51,7 +52,7 @@ export function Reveal({
   style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <Animated.View entering={FadeInDown.delay(80 + index * 60).springify().damping(22).stiffness(160)} style={style}>
+    <Animated.View entering={enterRise(60 + index * 50)} style={style}>
       {children}
     </Animated.View>
   );

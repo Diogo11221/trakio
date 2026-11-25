@@ -4,14 +4,14 @@ import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Icon, type IconName } from '@/components/Icon';
 import { PressableScale } from '@/components/PressableScale';
-import { colors, durations, fonts, springs } from '@/theme/tokens';
+import { easeOut } from '@/theme/motion';
+import { colors, durations, fonts } from '@/theme/tokens';
 
 type OptionCardProps = {
   title: string;
@@ -74,8 +74,9 @@ export function OptionCard({ title, description, icon, selected, onPress, traili
 export function Radio({ selected, size }: { selected: boolean; size: number }) {
   const fill = useSharedValue(selected ? 1 : 0);
 
+  // Timing, not a spring: a spring overshooting below 0 flips the dot and makes it flash.
   useEffect(() => {
-    fill.set(withSpring(selected ? 1 : 0, springs.snappy));
+    fill.set(withTiming(selected ? 1 : 0, { duration: selected ? 220 : 160, easing: easeOut }));
   }, [fill, selected]);
 
   const outerStyle = useAnimatedStyle(() => ({
@@ -83,7 +84,8 @@ export function Radio({ selected, size }: { selected: boolean; size: number }) {
     borderColor: interpolateColor(fill.get(), [0, 1], [colors.borderStrong, colors.volt]),
   }));
   const dotStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fill.get() }],
+    transform: [{ scale: Math.max(0, fill.get()) }],
+    opacity: fill.get(),
   }));
 
   const dot = Math.round(size * 0.36);

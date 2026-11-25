@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { PressableScale } from '@/components/PressableScale';
 import { haptics } from '@/lib/haptics';
-import { colors, fonts, springs } from '@/theme/tokens';
+import { colors, fonts } from '@/theme/tokens';
 
 type StepperProps = {
   value: string;
@@ -25,7 +25,7 @@ export function Stepper({ value, unit, onStep, style, accessibilityLabel }: Step
       first.current = false;
       return;
     }
-    pop.set(withSequence(withSpring(1.12, springs.press), withSpring(1, springs.snappy)));
+    pop.set(withSequence(withTiming(1.06, { duration: 90 }), withTiming(1, { duration: 160 })));
   }, [pop, value]);
 
   const valueStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.get() }] }));
@@ -43,7 +43,7 @@ export function Stepper({ value, unit, onStep, style, accessibilityLabel }: Step
       <RepeatButton label="−" muted onStep={() => onStep(-1)} />
       <Animated.View style={[styles.center, valueStyle]}>
         <AppText style={styles.value}>{value}</AppText>
-        <AppText variant="overline" tone="muted">
+        <AppText variant="overline" tone="muted" numberOfLines={1}>
           {unit}
         </AppText>
       </Animated.View>
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  center: { alignItems: 'center' },
+  center: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   value: { fontFamily: fonts.monoMedium, fontSize: 19, color: colors.text, fontVariant: ['tabular-nums'] },
   button: {
     width: 32,

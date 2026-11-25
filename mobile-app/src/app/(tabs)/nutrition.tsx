@@ -4,12 +4,10 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   FadeIn,
-  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withSpring,
-  ZoomIn,
 } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
@@ -23,6 +21,7 @@ import { PremiumSheet } from '@/features/nutrition/PremiumSheet';
 import { formatThousands } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useSettings } from '@/state/settings';
+import { enterRise } from '@/theme/motion';
 import { colors, fonts, springs } from '@/theme/tokens';
 
 const dayLabels = ['Hoje', 'Ontem', 'Domingo', 'Sábado', 'Sexta'];
@@ -52,7 +51,7 @@ export default function Nutrition() {
         gap={18}
         bottomInset={96}
         overlay={
-          <Animated.View entering={ZoomIn.delay(420).springify().damping(16)} style={styles.fabWrap}>
+          <Animated.View entering={enterRise(380)} style={styles.fabWrap}>
             <PressableScale onPress={openLogger} haptic="press" style={styles.fab} accessibilityLabel="Registar com IA">
               <Icon name="cameraDark" size={18} />
               <AppText style={styles.fabText}>Registar com IA</AppText>
@@ -66,7 +65,7 @@ export default function Nutrition() {
             <Pressable hitSlop={10} onPress={() => shiftDay(1)} accessibilityLabel="Dia anterior">
               <Icon name="datePrev" size={12} />
             </Pressable>
-            <Animated.View key={dayOffset} entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)}>
+            <Animated.View key={dayOffset} entering={FadeIn.duration(200)}>
               <AppText style={styles.dateText}>{dayLabels[dayOffset]}</AppText>
             </Animated.View>
             <Pressable

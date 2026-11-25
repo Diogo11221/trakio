@@ -49,12 +49,15 @@ export const radii = {
 /** Horizontal page padding used by every client screen in Figma. */
 export const pagePadding = 20;
 
-/** Motion presets — springs tuned to feel calm and physical, never bouncy-cartoonish. */
+/**
+ * Motion presets — springs are clamped so nothing overshoots its target:
+ * movement settles like a damped physical object instead of bouncing.
+ */
 export const springs = {
-  press: { damping: 18, stiffness: 420, mass: 0.6 },
-  snappy: { damping: 20, stiffness: 260 },
-  gentle: { damping: 22, stiffness: 140 },
-  sheet: { damping: 26, stiffness: 220, mass: 0.9 },
+  press: { damping: 30, stiffness: 520, mass: 0.6, overshootClamping: true },
+  snappy: { damping: 28, stiffness: 280, overshootClamping: true },
+  gentle: { damping: 30, stiffness: 160, overshootClamping: true },
+  sheet: { damping: 32, stiffness: 260, mass: 0.9, overshootClamping: true },
 } as const;
 
 export const durations = {

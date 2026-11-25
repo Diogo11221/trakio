@@ -6,7 +6,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  ZoomIn,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -16,6 +15,7 @@ import type { SetEntry } from '@/features/workout/data';
 import { ScrubValue } from '@/features/workout/components/ScrubValue';
 import { formatKg } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { enterFade } from '@/theme/motion';
 import { colors, fonts, radii, springs } from '@/theme/tokens';
 
 export const SET_COLUMNS = { set: 28, previous: 86, reps: 56, check: 30 } as const;
@@ -50,7 +50,7 @@ export function SetRow({ number, entry, state, onAdjust, onComplete }: SetRowPro
       </AppText>
       <View style={[styles.checkSlot, { width: SET_COLUMNS.check }]}>
         {done ? (
-          <Animated.View entering={ZoomIn.springify().damping(12).stiffness(260)}>
+          <Animated.View entering={enterFade(0, 200)}>
             <Icon name="checkVolt" size={16} />
           </Animated.View>
         ) : null}
@@ -97,7 +97,7 @@ function ActiveSetRow({
     opacity: interpolate(dx.get(), [0, COMPLETE_DISTANCE], [0, 0.22], 'clamp'),
   }));
   const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(dx.get(), [0, COMPLETE_DISTANCE], [1, 1.18], 'clamp') }],
+    transform: [{ scale: interpolate(dx.get(), [0, COMPLETE_DISTANCE], [1, 1.08], 'clamp') }],
     backgroundColor: interpolateColor(
       dx.get(),
       [COMPLETE_DISTANCE * 0.7, COMPLETE_DISTANCE],

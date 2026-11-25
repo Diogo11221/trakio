@@ -6,13 +6,13 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSequence,
-  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Icon, type IconName } from '@/components/Icon';
 import { haptics } from '@/lib/haptics';
-import { colors, fonts, springs } from '@/theme/tokens';
+import { colors, fonts } from '@/theme/tokens';
 
 const tabs: Record<string, { label: string; icon: IconName }> = {
   today: { label: 'Hoje', icon: 'tabToday' },
@@ -68,7 +68,7 @@ function TabButton({
   const bump = useSharedValue(1);
 
   useEffect(() => {
-    if (focused) bump.set(withSequence(withSpring(1.16, springs.press), withSpring(1, springs.snappy)));
+    if (focused) bump.set(withSequence(withTiming(1.08, { duration: 110 }), withTiming(1, { duration: 200 })));
   }, [bump, focused]);
 
   const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.get() }] }));

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Chip } from '@/components/Chip';
@@ -11,6 +11,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { IconButton } from '@/components/Surface';
 import { cities, specialties, trainers, type City, type Specialty, type Trainer } from '@/features/marketplace/data';
+import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
 
 /** Cliente · Encontrar PT. */
@@ -90,7 +91,7 @@ export default function FindTrainer() {
         {results.map((trainer, i) => (
           <Animated.View
             key={trainer.id}
-            layout={LinearTransition.springify().damping(20)}
+            layout={layoutGlide}
             entering={FadeIn.delay(300 + i * 60)}
             exiting={FadeOut.duration(150)}
           >

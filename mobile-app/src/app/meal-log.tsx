@@ -5,10 +5,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
-  FadeInDown,
-  FadeInRight,
   interpolateColor,
-  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -24,6 +21,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { IconButton } from '@/components/Surface';
 import { lunchEstimate, type EstimatedFood } from '@/features/nutrition/data';
 import { haptics } from '@/lib/haptics';
+import { enterRise, layoutGlide } from '@/theme/motion';
 import { colors, durations, fonts, pagePadding } from '@/theme/tokens';
 
 const GRAM_STEP = 5;
@@ -68,7 +66,7 @@ export default function MealLog() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInRight.delay(120).springify().damping(18)} style={styles.userMessage}>
+        <Animated.View entering={enterRise(120)} style={styles.userMessage}>
           <View style={styles.bubble}>
             <Image source={require('@/assets/figma/photo-lunch.jpg')} style={styles.photo} contentFit="cover" />
             <AppText variant="label" style={styles.bubbleText}>
@@ -94,12 +92,12 @@ export default function MealLog() {
         </View>
 
         {!thinking ? (
-          <Animated.View entering={FadeInDown.delay(120).springify().damping(20)} style={styles.estimate}>
+          <Animated.View entering={enterRise(120)} style={styles.estimate}>
             <View>
               {foods.map((food, i) => (
                 <Animated.View
                   key={food.id}
-                  layout={LinearTransition.springify()}
+                  layout={layoutGlide}
                   style={[styles.food, i < foods.length - 1 && styles.foodDivider]}
                 >
                   <AppText variant="label" style={styles.foodName}>

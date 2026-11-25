@@ -3,12 +3,10 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
-  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +19,8 @@ import { Reveal } from '@/components/Screen';
 import { Card } from '@/components/Surface';
 import { useWorkout, workoutSummary, type WorkoutState } from '@/features/workout/store';
 import { haptics } from '@/lib/haptics';
-import { colors, fonts, pagePadding, springs } from '@/theme/tokens';
+import { enterRise } from '@/theme/motion';
+import { colors, fonts, pagePadding } from '@/theme/tokens';
 
 const feelings: { value: NonNullable<WorkoutState['feeling']>; label: string }[] = [
   { value: 'easy', label: 'Fácil' },
@@ -40,15 +39,15 @@ export default function WorkoutDone() {
   const ring = useSharedValue(0);
   const tick = useSharedValue(0);
   useEffect(() => {
-    ring.set(withSpring(1, { damping: 11, stiffness: 180 }));
-    tick.set(withDelay(220, withTiming(1, { duration: 360, easing: Easing.out(Easing.back(2)) })));
+    ring.set(withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }));
+    tick.set(withDelay(220, withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) })));
     const id = setTimeout(() => haptics.success(), 240);
     return () => clearTimeout(id);
   }, [ring, tick]);
 
-  const ringStyle = useAnimatedStyle(() => ({ transform: [{ scale: ring.get() }], opacity: ring.get() }));
+  const ringStyle = useAnimatedStyle(() => ({ transform: [{ scale: 0.85 + ring.get() * 0.15 }], opacity: ring.get() }));
   const tickStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.4 + tick.get() * 0.6 }, { rotate: `${(1 - tick.get()) * -20}deg` }],
+    transform: [{ scale: 0.7 + tick.get() * 0.3 }],
     opacity: tick.get(),
   }));
 
@@ -127,7 +126,7 @@ export default function WorkoutDone() {
         </Reveal>
       </View>
 
-      <Animated.View entering={FadeInDown.delay(560).springify().damping(22)} style={styles.bottom}>
+      <Animated.View entering={enterRise(560)} style={styles.bottom}>
         <Button label="Enviar resumo à Rita" height={54} onPress={close} />
         <Button label="Fechar" variant="ghost" height={46} onPress={close} />
       </Animated.View>
@@ -149,7 +148,7 @@ function Stat({ value, label, suffix = '' }: { value: number; label: string; suf
       setShown(Math.round(value * eased));
       if (t >= 1) {
         clearInterval(id);
-        pop.set(withSequence(withSpring(1.08, springs.press), withSpring(1, springs.snappy)));
+        pop.set(withSequence(withTiming(1.05, { duration: 100 }), withTiming(1, { duration: 180 })));
       }
     }, 32);
     return () => clearInterval(id);

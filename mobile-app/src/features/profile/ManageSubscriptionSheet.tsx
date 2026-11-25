@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -8,7 +8,7 @@ import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { Pill } from '@/components/Surface';
 import { haptics } from '@/lib/haptics';
-import { colors, fonts, springs } from '@/theme/tokens';
+import { colors, fonts } from '@/theme/tokens';
 
 type Props = {
   visible: boolean;
@@ -76,13 +76,13 @@ export function ManageSubscriptionSheet({ visible, onClose, onCancelled }: Props
 function Checkbox({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
   const on = useSharedValue(checked ? 1 : 0);
   useEffect(() => {
-    on.set(withSpring(checked ? 1 : 0, springs.snappy));
+    on.set(withTiming(checked ? 1 : 0, { duration: 180 }));
   }, [checked, on]);
   const boxStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(on.get(), [0, 1], ['rgba(212,255,0,0)', colors.volt]),
     borderColor: interpolateColor(on.get(), [0, 1], [colors.borderStrong, colors.volt]),
   }));
-  const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: on.get() }] }));
+  const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: Math.max(0, on.get()) }], opacity: on.get() }));
 
   return (
     <Pressable
