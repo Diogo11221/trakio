@@ -4,6 +4,28 @@
   color: var(--color-light-text);
   overflow: hidden;
 }
+/* Light drafting grid + topographic contour lines (contours move with scroll). */
+.texture {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(17, 19, 24, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 19, 24, 0.045) 1px, transparent 1px);
+  background-size: 80px 80px;
+  background-position: calc(50% + 40px) 0;
+}
+.topo {
+  position: absolute;
+  inset: -15%;
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  opacity: 0.16;
+  will-change: transform;
+}
+
 .frame {
   position: relative;
   max-width: var(--page-max);

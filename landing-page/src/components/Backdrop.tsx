@@ -1,19 +1,33 @@
+import { useEffect, useRef } from 'react';
+import { subscribeScroll } from '../hooks/scrollBus';
 import styles from './Backdrop.module.css';
 
+/** Grid period (px) of the registration marks; the line grid (80px) divides it. */
+const PERIOD = 320;
+const PARALLAX = 0.35;
+
 /**
- * One continuous background behind the whole page: large, very soft pools of
- * graphite and steel light (and a trace of Volt) drifting slowly, like light
- * moving across brushed metal. Dark sections are transparent so it flows
- * from one to the next. Pure CSS transforms, so it stays on the compositor.
+ * Page-wide drafting grid behind every dark section: hairlines every 80px
+ * with "+" registration marks every 320px. It drifts at a slower rate than
+ * the content (parallax), so the page has depth without any glow.
  */
 export function Backdrop() {
+  const grid = useRef<HTMLDivElement>(null);
+
+  useEffect(
+    () =>
+      subscribeScroll((y) => {
+        if (grid.current) {
+          const offset = -((y * PARALLAX) % PERIOD);
+          grid.current.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`;
+        }
+      }),
+    [],
+  );
+
   return (
     <div className={styles.backdrop} aria-hidden="true">
-      <span className={`${styles.pool} ${styles.steel}`} />
-      <span className={`${styles.pool} ${styles.graphite}`} />
-      <span className={`${styles.pool} ${styles.volt}`} />
-      <span className={`${styles.pool} ${styles.cool}`} />
-      <span className={styles.vignette} />
+      <div ref={grid} className={styles.grid} />
     </div>
   );
 }
