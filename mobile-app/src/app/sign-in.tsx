@@ -1,26 +1,54 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Logo } from '@/components/Logo';
 import { Reveal } from '@/components/Screen';
-import { TextField } from '@/components/TextField';
+import { Chip } from '@/components/Chip';
+import { AuthFields, FormError } from '@/features/auth/AuthForm';
+import { DEMO_PASSWORD, demoLogins } from '@/features/auth/localAuth';
+import { AuthError } from '@/features/auth/types';
 import { haptics } from '@/lib/haptics';
+import { homeFor, useAuth } from '@/state/auth';
 import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
 
-/** Cliente · Entrar. Auth isn't wired yet — every path lands on "Hoje". */
+/** Entrar — test accounts stored on this phone (see features/auth/localAuth). */
 export default function SignIn() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { signIn } = useAuth();
+  const { mode, setMode } = useSettings();
 
-  const { mode } = useSettings();
-  const enter = () => router.replace(mode === 'trainer' ? '/pt/home' : '/today');
+  const enter = async () => {
+    if (busy) return;
+    if (!email.trim() || !password) {
+      setError('Escreve o email e a palavra-passe.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const account = await signIn(email, password);
+      if (account.role === 'trainer') setMode('trainer');
+      else if (mode === 'trainer') setMode('solo');
+      haptics.success();
+      router.replace(homeFor(account));
+    } catch (e) {
+      haptics.warning();
+      setError(e instanceof AuthError ? e.message : 'Não foi possível entrar. Tenta outra vez.');
+      setBusy(false);
+    }
+  };
+
+  const notYet = () =>
+    Alert.alert('Ainda não disponível', 'Na versão de teste entra-se com email e palavra-passe.');
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -42,48 +70,42 @@ export default function SignIn() {
           </AppText>
         </Reveal>
 
-        <Reveal index={2}>
-          <TextField
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="o-teu@email.pt"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-          />
+        <Reveal index={2} style={styles.fields}>
+          <AuthFields email={email} password={password} onEmail={setEmail} onPassword={setPassword} onSubmit={enter} newPassword={false} />
         </Reveal>
-        <Reveal index={3}>
-          <TextField
-            label="Palavra-passe"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoComplete="current-password"
-            textContentType="password"
-            trailing={
-              <Pressable
-                hitSlop={10}
-                onPress={() => {
-                  haptics.tick();
-                  setShowPassword((v) => !v);
-                }}
-                accessibilityRole="button"
-              >
-                <AppText style={styles.link}>{showPassword ? 'Esconder' : 'Mostrar'}</AppText>
-              </Pressable>
-            }
-          />
-        </Reveal>
+        <FormError message={error} />
         <Reveal index={4} style={styles.forgot}>
-          <Pressable hitSlop={8} accessibilityRole="link">
+          <Pressable
+            hitSlop={8}
+            accessibilityRole="link"
+            onPress={() => Alert.alert('Versão de teste', 'Ainda não há recuperação da palavra-passe. Usa uma conta de teste ou cria outra.')}
+          >
             <AppText style={styles.link}>Esqueci-me da palavra-passe</AppText>
           </Pressable>
         </Reveal>
 
         <Reveal index={5}>
-          <Button label="Entrar" height={54} onPress={enter} />
+          <Button label={busy ? 'A entrar…' : 'Entrar'} height={54} disabled={busy} onPress={enter} />
+        </Reveal>
+        <Reveal index={5} style={styles.demo}>
+          <AppText variant="caption" tone="muted">
+            Contas de teste
+          </AppText>
+          <View style={styles.demoChips}>
+            {demoLogins.map((demo) => (
+              <Chip
+                key={demo.email}
+                label={demo.label}
+                kind="outline"
+                selected={email === demo.email}
+                onPress={() => {
+                  setEmail(demo.email);
+                  setPassword(DEMO_PASSWORD);
+                  setError(null);
+                }}
+              />
+            ))}
+          </View>
         </Reveal>
         <Reveal index={6} style={styles.divider}>
           <View style={styles.rule} />
@@ -93,10 +115,10 @@ export default function SignIn() {
           <View style={styles.rule} />
         </Reveal>
         <Reveal index={7}>
-          <Button label="Continuar com a Apple" variant="light" leadingIcon="apple" height={52} onPress={enter} />
+          <Button label="Continuar com a Apple" variant="light" leadingIcon="apple" height={52} onPress={notYet} />
         </Reveal>
         <Reveal index={8}>
-          <Button label="Continuar com o Google" variant="outline" leadingIcon="google" height={52} onPress={enter} />
+          <Button label="Continuar com o Google" variant="outline" leadingIcon="google" height={52} onPress={notYet} />
         </Reveal>
 
         <Pressable
@@ -104,7 +126,7 @@ export default function SignIn() {
           hitSlop={10}
           onPress={() => {
             haptics.tap();
-            router.back();
+            router.replace('/sign-up');
           }}
           accessibilityRole="link"
         >
@@ -123,7 +145,10 @@ const styles = StyleSheet.create({
   spacer: { height: 20 },
   heading: { gap: 6 },
   title: { fontSize: 30, letterSpacing: -0.9 },
+  fields: { gap: 18 },
   forgot: { alignItems: 'flex-end' },
+  demo: { gap: 8, alignItems: 'center' },
+  demoChips: { flexDirection: 'row', gap: 8 },
   link: { fontFamily: fonts.uiMedium, fontSize: 13, color: colors.textMuted },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rule: { flex: 1, height: 1, backgroundColor: colors.border },

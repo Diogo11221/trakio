@@ -101,7 +101,7 @@ export default function Welcome() {
         </View>
 
         <View style={styles.bottom}>
-          <Button label="Continuar" onPress={() => router.replace(mode === 'trainer' ? '/pt/home' : '/today')} />
+          <Button label="Criar conta" onPress={() => router.push('/sign-up')} />
           <Pressable
             onPress={() => {
               haptics.tap();

@@ -4,6 +4,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
+import { Avatar } from '@/components/Avatar';
 import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
@@ -12,6 +13,9 @@ import { Toggle } from '@/components/Toggle';
 import { PremiumSheet } from '@/features/nutrition/PremiumSheet';
 import { useWorkout } from '@/features/workout/store';
 import { ManageSubscriptionSheet } from '@/features/profile/ManageSubscriptionSheet';
+import { experienceLabel } from '@/features/auth/types';
+import { goalLabel } from '@/features/tools/data';
+import { useAuth, useClientProfile } from '@/state/auth';
 import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
 import { refreshMockData } from '@/lib/refresh';
@@ -21,6 +25,10 @@ export default function Profile() {
   const { vibration, setVibration, lockScreenAlert, setLockScreenAlert, premium, setPremium } = useSettings();
   const [sheet, setSheet] = useState<'premium' | 'manage' | null>(null);
   const { reset } = useWorkout();
+  const { account, signOut: endSession, deleteAccount } = useAuth();
+  const profile = useClientProfile();
+  const coached = profile.coached;
+  const kg = (v: number) => `${String(v).replace('.', ',')} kg`;
 
   const signOut = () =>
     Alert.alert('Terminar sessão?', 'Vais precisar de entrar outra vez para ver o teu plano.', [
@@ -28,8 +36,23 @@ export default function Profile() {
       {
         text: 'Terminar sessão',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           reset();
+          await endSession();
+          router.replace('/welcome');
+        },
+      },
+    ]);
+
+  const removeAccount = () =>
+    Alert.alert('Apagar esta conta de teste?', 'O perfil e os dados guardados neste telemóvel são apagados. Não dá para desfazer.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Apagar conta',
+        style: 'destructive',
+        onPress: async () => {
+          reset();
+          await deleteAccount();
           router.replace('/welcome');
         },
       },
@@ -39,51 +62,78 @@ export default function Profile() {
     <>
       <Screen gap={14} onRefresh={refreshMockData}>
         <Reveal index={0} style={styles.header}>
-          <Portrait person="miguel" size={56} />
+          <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={56} name={profile.name} />
           <View style={styles.headerText}>
-            <AppText variant="heading">Miguel Costa</AppText>
+            <AppText variant="heading">{profile.name}</AppText>
             <View style={styles.pills}>
-              <Pill label="Com PT" />
+              <Pill label={coached ? 'Com PT' : 'Sozinho'} />
               {premium ? <Pill label="Premium" tone="volt" /> : null}
             </View>
           </View>
         </Reveal>
 
         <Reveal index={1}>
-          <SectionLabel>O meu PT</SectionLabel>
+          <SectionLabel>Os meus dados</SectionLabel>
         </Reveal>
         <Reveal index={2}>
           <Card radius={16}>
-            <CardRow style={styles.ptRow}>
-              <Portrait person="rita" size={36} />
-              <View style={styles.flex}>
-                <AppText style={styles.ptName}>Rita Santos</AppText>
-                <AppText variant="caption" tone="muted">
-                  Treino + Nutrição · 45€/mês
-                </AppText>
-              </View>
-              <PressableScale style={styles.message} accessibilityRole="button" accessibilityLabel="Mensagem à Rita">
-                <AppText style={styles.messageText}>Mensagem</AppText>
-              </PressableScale>
-            </CardRow>
-            <SettingRow label="Encontrar outro PT" onPress={() => router.push('/trainers')} last />
+            <SettingRow label="Peso" value={kg(profile.weightKg)} onPress={() => router.push('/edit-profile')} />
+            <SettingRow label="Altura" value={`${profile.heightCm} cm`} onPress={() => router.push('/edit-profile')} />
+            <SettingRow
+              label="Objetivo"
+              value={profile.goalWeightKg !== null ? `${goalLabel[profile.goal]} · ${kg(profile.goalWeightKg)}` : goalLabel[profile.goal]}
+              onPress={() => router.push('/edit-profile')}
+            />
+            <SettingRow
+              label="Treino"
+              value={`${profile.daysPerWeek}× por semana · ${experienceLabel[profile.experience]}`}
+              onPress={() => router.push('/edit-profile')}
+            />
+            <SettingRow label="Editar perfil" onPress={() => router.push('/edit-profile')} last />
           </Card>
         </Reveal>
 
         <Reveal index={3}>
-          <SectionLabel>Dispositivos</SectionLabel>
+          <SectionLabel>O meu PT</SectionLabel>
         </Reveal>
         <Reveal index={4}>
+          {coached ? (
+            <Card radius={16}>
+              <CardRow style={styles.ptRow}>
+                <Portrait person="rita" size={36} />
+                <View style={styles.flex}>
+                  <AppText style={styles.ptName}>Rita Santos</AppText>
+                  <AppText variant="caption" tone="muted">
+                    Treino + Nutrição · 45€/mês
+                  </AppText>
+                </View>
+                <PressableScale style={styles.message} accessibilityRole="button" accessibilityLabel="Mensagem à Rita">
+                  <AppText style={styles.messageText}>Mensagem</AppText>
+                </PressableScale>
+              </CardRow>
+              <SettingRow label="Encontrar outro PT" onPress={() => router.push('/trainers')} last />
+            </Card>
+          ) : (
+            <Card radius={16}>
+              <SettingRow label="Encontrar um PT" value="Marketplace" onPress={() => router.push('/trainers')} last />
+            </Card>
+          )}
+        </Reveal>
+
+        <Reveal index={5}>
+          <SectionLabel>Dispositivos</SectionLabel>
+        </Reveal>
+        <Reveal index={6}>
           <Card radius={16}>
             <SettingRow label="Apple Watch" value="Ligado" leading={<Icon name="dotGreen" size={8} />} />
             <SettingRow label="Apple Health" value="há 5 min" leading={<Icon name="dotGreen" size={8} />} last />
           </Card>
         </Reveal>
 
-        <Reveal index={5}>
+        <Reveal index={7}>
           <SectionLabel>Treino</SectionLabel>
         </Reveal>
-        <Reveal index={6}>
+        <Reveal index={8}>
           <Card radius={16}>
             <SettingRow label="Calculadoras" value="Massa corporal, calorias…" onPress={() => router.push('/tools')} />
             <SettingRow label="Som do fim do descanso" value="Plim" />
@@ -105,21 +155,23 @@ export default function Profile() {
           </Card>
         </Reveal>
 
-        <Reveal index={7}>
+        <Reveal index={9}>
           <SectionLabel>Conta</SectionLabel>
         </Reveal>
-        <Reveal index={8}>
+        <Reveal index={10}>
           <Card radius={16}>
             <SettingRow
               label="Subscrição"
               value={premium ? 'Premium' : 'Gratuita'}
               onPress={() => setSheet(premium ? 'manage' : 'premium')}
             />
-            <SettingRow label="Idioma" value="Português (PT)" last />
+            <SettingRow label="Email" value={account?.email ?? '—'} />
+            <SettingRow label="Idioma" value="Português (PT)" />
+            <SettingRow label="Apagar conta de teste" onPress={removeAccount} last />
           </Card>
         </Reveal>
 
-        <Reveal index={9}>
+        <Reveal index={11}>
           <PressableScale
             onPress={signOut}
             haptic="tap"

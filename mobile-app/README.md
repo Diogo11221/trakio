@@ -24,7 +24,10 @@ npm run lint
 ```
 src/
   app/                 rotas (Expo Router)
-    welcome, sign-in   entrada
+    welcome            como vais treinar (sozinho / com PT / sou PT)
+    sign-up, sign-in   criar conta e entrar (contas de teste)
+    onboarding         criar perfil em passos (cliente 5, PT 4)
+    edit-profile       editar perfil
     (tabs)/            Hoje · Treinar · Nutrição · Progresso · Perfil
     workout            treino ao vivo (série ⇄ descanso, ordem do treino)
     workout-done       resumo
@@ -34,12 +37,27 @@ src/
     pt/                app do PT: Início · Alunos · Planos · Mensagens · Ganhos,
                        aluno, editor de plano, conversa, verificar perfil, tools/
   components/          design system (texto, botões, sheet, anel, segmented…)
-  features/            workout · nutrition · marketplace · profile · pt · tools
+  features/            auth · workout · nutrition · marketplace · profile · pt · tools
   lib/                 haptics, formatação pt-PT, useNow
-  state/               preferências (vibração, alerta, Premium)
+  state/               sessão (auth), preferências (vibração, alerta, Premium)
   theme/tokens.ts      espelho das variáveis "Trakio Tokens" do Figma
 assets/figma/          ícones e renders exportados do Figma
 ```
+
+## Contas (versão de teste)
+
+Ainda não há base de dados: as contas ficam guardadas **só no telemóvel** (AsyncStorage), com a
+palavra-passe com sal e SHA-256 (`features/auth/localAuth.ts`). O módulo tem a mesma forma que a futura
+API do `backend-core` — troca-se esse ficheiro e os ecrãs ficam iguais.
+
+- **Criar conta** → email e palavra-passe (8+ caracteres) → **perfil em passos**:
+  - cliente: nome e foto · sexo, ano de nascimento, altura, peso · objetivo (e peso a atingir) · dias de treino, experiência, atividade · resumo com o índice de massa corporal e as calorias;
+  - PT: nome e foto · cidade / online · especialidades (até 4) · resumo.
+- A sessão mantém-se ao fechar a app; **Terminar sessão** e **Apagar conta de teste** estão no Perfil (PT: Conta).
+- O nome, a foto e as medidas aparecem em Hoje, Perfil, Início do PT e nas calculadoras.
+- Contas de teste (palavra-passe `trakio123`), também como atalho em Entrar:
+  - `miguel@trakio.test` — aluno com PT
+  - `rita@trakio.test` — PT
 
 ## Calculadoras
 
@@ -80,5 +98,5 @@ Pagamentos (Premium, contratar PT) são sempre uma confirmação explícita com 
 ## Ainda por ligar
 
 - Dados são mock (`features/*/data.ts`) até existir API no `backend-core` / `backend-ai`.
-- Autenticação, Stripe e IA de refeições são simulados.
+- Contas são locais (teste); Stripe e IA de refeições são simulados. Entrar com Apple/Google ainda não está ligado.
 - Live Activity no ecrã bloqueado (estado C do Figma) precisa de extensão nativa — por agora é uma notificação local.

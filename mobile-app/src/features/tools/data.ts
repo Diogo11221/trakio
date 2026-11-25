@@ -1,4 +1,5 @@
 import type { Person } from '@/components/Portrait';
+import type { ClientProfile } from '@/features/auth/types';
 import { formatThousands } from '@/lib/format';
 
 import {
@@ -207,3 +208,30 @@ export const goalLabel: Record<Goal, string> = {
   maintain: 'Manter o peso',
   gain: 'Ganhar músculo',
 };
+
+/** Age in whole years from the year of birth (close enough for the calculators). */
+export function ageFrom(birthYear: number): number {
+  return new Date().getFullYear() - birthYear;
+}
+
+/**
+ * Calculator inputs from the signed-in client's profile. Tape measurements
+ * and the reference lift aren't asked in onboarding, so they start from
+ * typical values the person can edit on each tool.
+ */
+export function bodyFromProfile(profile: ClientProfile): BodyData {
+  const male = profile.sex === 'male';
+  return {
+    sex: profile.sex,
+    age: ageFrom(profile.birthYear),
+    weightKg: profile.weightKg,
+    heightCm: profile.heightCm,
+    waistCm: male ? 84 : 74,
+    neckCm: male ? 38 : 32,
+    hipCm: male ? 96 : 99,
+    activity: profile.activity,
+    goal: profile.goal,
+    trainingMinutes: profile.daysPerWeek > 0 ? 60 : 0,
+    lift: { exercise: 'Supino plano', weightKg: Math.max(20, Math.round((profile.weightKg * 0.7) / 2.5) * 2.5), reps: 8 },
+  };
+}

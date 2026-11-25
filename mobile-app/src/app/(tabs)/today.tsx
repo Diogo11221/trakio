@@ -8,6 +8,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring } fro
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Avatar } from '@/components/Avatar';
 import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { ProgressRing, useRingSweep } from '@/components/ProgressRing';
@@ -17,6 +18,7 @@ import { useWorkout } from '@/features/workout/store';
 import { formatThousands, formatToday, greeting } from '@/lib/format';
 import { colors, fonts, springs } from '@/theme/tokens';
 import { refreshMockData } from '@/lib/refresh';
+import { firstName, useClientProfile } from '@/state/auth';
 
 const readiness = 78;
 const kcal = { eaten: 1361, goal: 2400 };
@@ -25,6 +27,7 @@ const kcal = { eaten: 1361, goal: 2400 };
 export default function Today() {
   const { start } = useWorkout();
   const now = new Date();
+  const profile = useClientProfile();
   const ring = useRingSweep(kcal.eaten / kcal.goal, 300);
 
   return (
@@ -34,10 +37,12 @@ export default function Today() {
           <AppText variant="caption" style={styles.date} tone="muted">
             {formatToday(now)}
           </AppText>
-          <AppText variant="title">{greeting(now)}, Miguel</AppText>
+          <AppText variant="title">
+            {greeting(now)}, {firstName(profile.name)}
+          </AppText>
         </View>
         <PressableScale onPress={() => router.navigate('/profile')} accessibilityLabel="Perfil">
-          <Portrait person="miguel" size={42} />
+          <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={42} name={profile.name} />
         </PressableScale>
       </Reveal>
 

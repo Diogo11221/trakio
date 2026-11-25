@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { IntroOverlay } from '@/components/IntroOverlay';
 import { WorkoutProvider } from '@/features/workout/store';
+import { AuthProvider } from '@/state/auth';
 import { SettingsProvider } from '@/state/settings';
 import { colors } from '@/theme/tokens';
 
@@ -42,35 +43,40 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <ThemeProvider value={navigationTheme}>
-        <SettingsProvider>
-          <WorkoutProvider>
-            <StatusBar style="light" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.bg },
-                animation: 'slide_from_right',
-              }}
-            >
-              <Stack.Screen name="index" options={{ animation: 'none' }} />
-              <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-              <Stack.Screen name="sign-in" />
-              <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
-              <Stack.Screen
-                name="workout"
-                options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
-              />
-              <Stack.Screen name="workout-done" options={{ animation: 'fade', gestureEnabled: false }} />
-              <Stack.Screen name="meal-log" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="trainers/index" />
-              <Stack.Screen name="trainers/[id]" />
-              <Stack.Screen name="tools/index" />
-              <Stack.Screen name="tools/[id]" />
-              <Stack.Screen name="pt" options={{ animation: 'fade', gestureEnabled: false }} />
-            </Stack>
-            <IntroOverlay />
-          </WorkoutProvider>
-        </SettingsProvider>
+        <AuthProvider>
+          <SettingsProvider>
+            <WorkoutProvider>
+              <StatusBar style="light" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.bg },
+                  animation: 'slide_from_right',
+                }}
+              >
+                <Stack.Screen name="index" options={{ animation: 'none' }} />
+                <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+                <Stack.Screen name="sign-in" />
+                <Stack.Screen name="sign-up" />
+                <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
+                <Stack.Screen name="edit-profile" />
+                <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
+                <Stack.Screen
+                  name="workout"
+                  options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
+                />
+                <Stack.Screen name="workout-done" options={{ animation: 'fade', gestureEnabled: false }} />
+                <Stack.Screen name="meal-log" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="trainers/index" />
+                <Stack.Screen name="trainers/[id]" />
+                <Stack.Screen name="tools/index" />
+                <Stack.Screen name="tools/[id]" />
+                <Stack.Screen name="pt" options={{ animation: 'fade', gestureEnabled: false }} />
+              </Stack>
+              <IntroOverlay />
+            </WorkoutProvider>
+          </SettingsProvider>
+        </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

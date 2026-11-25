@@ -264,13 +264,35 @@ export function ToolGrid({
   tools = toolIds,
 }: {
   body: BodyData;
-  onOpen: (tool: ToolId) => void;
+  /** Leave out for a read-only grid (e.g. the onboarding summary). */
+  onOpen?: (tool: ToolId) => void;
   tools?: ToolId[];
 }) {
   return (
     <View style={styles.grid}>
       {tools.map((tool) => {
         const preview = toolPreview(tool, body);
+        const content = (
+          <>
+            <AppText variant="caption" tone="muted" numberOfLines={1}>
+              {toolInfo[tool].short}
+            </AppText>
+            <View style={styles.tileValueRow}>
+              <AppText style={styles.tileValue}>{preview.value}</AppText>
+              {preview.unit ? <AppText style={styles.tileUnit}>{preview.unit}</AppText> : null}
+            </View>
+            <AppText variant="caption" tone="muted" numberOfLines={1}>
+              {preview.note}
+            </AppText>
+          </>
+        );
+        if (!onOpen) {
+          return (
+            <View key={tool} style={[styles.tileWrap, styles.tile]}>
+              {content}
+            </View>
+          );
+        }
         return (
           <PressableScale
             key={tool}
@@ -282,16 +304,7 @@ export function ToolGrid({
             accessibilityRole="button"
             accessibilityLabel={`${toolInfo[tool].title}: ${preview.value} ${preview.unit}`}
           >
-            <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {toolInfo[tool].short}
-            </AppText>
-            <View style={styles.tileValueRow}>
-              <AppText style={styles.tileValue}>{preview.value}</AppText>
-              {preview.unit ? <AppText style={styles.tileUnit}>{preview.unit}</AppText> : null}
-            </View>
-            <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {preview.note}
-            </AppText>
+            {content}
           </PressableScale>
         );
       })}

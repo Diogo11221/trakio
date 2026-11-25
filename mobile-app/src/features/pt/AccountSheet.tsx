@@ -3,10 +3,11 @@ import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { PressableScale } from '@/components/PressableScale';
 import { Sheet } from '@/components/Sheet';
 import { useTrainer } from '@/features/pt/store';
+import { useAuth, useTrainerProfile } from '@/state/auth';
 import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -14,6 +15,9 @@ import { colors, fonts } from '@/theme/tokens';
 export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { steps, verificationSent, marketplaceActive } = useTrainer();
   const { setMode } = useSettings();
+  const { signOut: endSession } = useAuth();
+  const profile = useTrainerProfile();
+  const where = [profile.city, profile.online ? 'Online' : ''].filter(Boolean).join(' + ');
   const done = steps.filter((s) => s.done).length;
 
   const go = (action: () => void) => {
@@ -27,7 +31,11 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
       {
         text: 'Terminar sessão',
         style: 'destructive',
-        onPress: () => go(() => router.replace('/welcome')),
+        onPress: () =>
+          go(async () => {
+            await endSession();
+            router.replace('/welcome');
+          }),
       },
     ]);
 
@@ -38,17 +46,18 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
       accessibilityLabel="Conta"
       header={
         <View style={styles.header}>
-          <Portrait person="rita" size={48} />
+          <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={48} name={profile.name} />
           <View style={styles.flex}>
-            <AppText variant="heading">Rita Santos</AppText>
+            <AppText variant="heading">{profile.name}</AppText>
             <AppText variant="small" tone="muted">
-              Personal Trainer · Lisboa + Online
+              Personal Trainer · {where}
             </AppText>
           </View>
         </View>
       }
     >
       <View style={styles.group}>
+        <Row label="Editar perfil" onPress={() => go(() => router.push('/edit-profile'))} />
         <Row
           label="Verificar perfil"
           value={verificationSent ? 'Em análise' : `${done} de ${steps.length}`}
