@@ -1,53 +1,4 @@
-.hero {
-  position: relative;
-  height: clamp(760px, 100svh, 980px);
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(150, 160, 178, 0.1), transparent 70%),
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 255, 255, 0.025), transparent 60%),
-    var(--color-bg);
-}
-
-/* Faint machined ruling — a nod to the engineering-spec look. */
-.hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
-  background-size: 120px 100%;
-  background-position: center;
-  mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, #000 20%, transparent 75%);
-}
-
-/* Soft floor so the cropped phone fades into the next section. */
-.hero::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: 3;
-  height: 96px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(11, 12, 14, 0), var(--color-bg));
-}
-
-.backdrop {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  animation: fadeIn 2.4s var(--ease-out) 0.4s forwards;
-  /* Keep the plates out of the reading area. */
-  mask-image: radial-gradient(ellipse 34% 46% at 50% 38%, transparent 35%, #000 85%);
-}
-
-.frame {
-  position: relative;
-  height: 100%;
-  max-width: var(--page-max);
-  margin: 0 auto;
-  perspective: 1600px;
-}
-
+/* Shared hero copy */
 .copy {
   position: relative;
   z-index: 2;
@@ -57,7 +8,6 @@
   align-items: center;
   gap: 28px;
   text-align: center;
-  will-change: transform, opacity;
 }
 .copy > * {
   opacity: 0;
@@ -122,83 +72,36 @@
   color: var(--color-text-muted);
 }
 
-.phoneStage {
+/* Mobile hero */
+.mobileHero {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse 80% 40% at 50% 100%, rgba(150, 160, 178, 0.1), transparent 70%);
+}
+.mobileHero::after {
+  content: '';
   position: absolute;
-  z-index: 1;
-  left: 50%;
-  top: calc(100% - 332px);
-  width: 360px;
-  margin-left: -180px;
-  transform-style: preserve-3d;
+  inset: auto 0 0 0;
+  height: 72px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(11, 12, 14, 0), var(--color-bg));
+}
+.mobilePhone {
+  position: relative;
+  /* Shows the top ~300px of the phone, below the copy — never on top of it. */
+  height: 300px;
+  margin-top: 40px;
+  display: flex;
+  justify-content: center;
+  perspective: 1400px;
 }
 .phoneEntrance {
-  /* Perspective lives on the direct parent: an element with a running/filled
-     animation can flatten 3D for its descendants in Chrome. The origin matches
-     the centre of the 1440 × 900 hero frame. */
-  perspective: 1600px;
-  perspective-origin: 50% -118px;
   transform-style: preserve-3d;
   animation: phoneIn 1.6s var(--ease-out) 0.35s both;
 }
-.phone {
-  transform-origin: 50% 100%;
-  transform: rotateX(24deg);
-  will-change: transform;
-}
-
-.scrollCue,
-.storyIndex {
-  position: absolute;
-  z-index: 2;
-  bottom: 40px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 16px;
-  color: var(--color-text-muted);
-  opacity: 0;
-  animation: fadeIn 1s ease 1.2s forwards;
-}
-.scrollCue {
-  left: var(--page-gutter);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.mouse {
-  width: 22px;
-  height: 34px;
-  border: 1px solid #3a3f49;
-  border-radius: 11px;
-  display: flex;
-  justify-content: center;
-  padding-top: 7px;
-}
-.mouse span {
-  width: 2px;
-  height: 7px;
-  border-radius: 1px;
-  background: var(--color-volt);
-  animation: wheel 1.8s var(--ease-in-out) infinite;
-}
-.storyIndex {
-  right: var(--page-gutter);
-  bottom: 42px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-.ticks {
-  display: flex;
-  gap: 6px;
-}
-.ticks span {
-  width: 24px;
-  height: 2px;
-  background: var(--color-border-strong);
-}
-.ticks span[data-active='true'] {
-  background: var(--color-text);
+.mobilePhoneTilt {
+  transform-origin: 50% 0;
+  transform: rotateX(14deg) scale(0.82);
 }
 
 @keyframes rise {
@@ -211,46 +114,39 @@
     transform: none;
   }
 }
-@keyframes fadeIn {
-  to {
-    opacity: 1;
-  }
-}
 @keyframes phoneIn {
   from {
     opacity: 0;
-    transform: translate3d(0, 220px, -120px) rotateX(18deg);
+    transform: translate3d(0, 160px, 0);
   }
   to {
     opacity: 1;
     transform: none;
   }
 }
-@keyframes wheel {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
+
+/* Short desktop viewports: scale the hero copy with the height so the phone
+   still shows below it instead of being pushed out of view. */
+@media (min-width: 961px) and (max-height: 820px) {
+  .copy {
+    gap: clamp(14px, 3vh, 28px);
+    padding-top: calc(var(--nav-height) + clamp(20px, 5vh, 64px));
   }
-  70% {
-    transform: translateY(9px);
-    opacity: 0;
+  .title {
+    font-size: min(5.3vw, 9vh);
   }
-  100% {
-    transform: translateY(0);
-    opacity: 0;
+  .lead {
+    font-size: 16px;
+    line-height: 24px;
   }
 }
-
-@media (max-width: 1100px) {
-  .scrollCue,
-  .storyIndex {
+@media (min-width: 961px) and (max-height: 640px) {
+  .note {
     display: none;
   }
 }
+
 @media (max-width: 640px) {
-  .hero {
-    height: clamp(720px, 100svh, 860px);
-  }
   .copy {
     gap: 22px;
     padding-top: calc(var(--nav-height) + 40px);
@@ -268,10 +164,5 @@
   }
   .note {
     display: none;
-  }
-  .phoneStage {
-    top: calc(100% - 250px);
-    transform: scale(0.82);
-    transform-origin: 50% 0;
   }
 }

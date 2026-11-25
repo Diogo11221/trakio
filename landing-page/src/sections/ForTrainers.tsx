@@ -1,4 +1,5 @@
 import { useRef, type CSSProperties } from 'react';
+import topoLines from '../assets/textures-topo.svg';
 import { FitScale } from '../components/FitScale';
 import { useRevealChildren } from '../hooks/useInView';
 import { useScrollProgress } from '../hooks/useScrollProgress';
@@ -16,6 +17,7 @@ const details = [
 export function ForTrainers() {
   const section = useRef<HTMLElement>(null);
   const visual = useRef<HTMLDivElement>(null);
+  const topo = useRef<HTMLImageElement>(null);
   useRevealChildren(section);
 
   // The window and phone settle from a steep angle into place as the section scrolls in.
@@ -23,10 +25,17 @@ export function ForTrainers() {
     const t = Math.min(1, Math.max(0, (progress - 0.08) / 0.42));
     visual.current?.style.setProperty('--settle', (1 - t * (2 - t)).toFixed(4));
     visual.current?.style.setProperty('--drift', (progress - 0.5).toFixed(4));
+    // Contour lines turn and swell slowly as the section passes.
+    if (topo.current) {
+      topo.current.style.transform = `rotate(${(-6 + progress * 10).toFixed(2)}deg) scale(${(1.05 + progress * 0.12).toFixed(4)})`;
+    }
   });
 
   return (
     <section ref={section} id="para-pts" className={styles.section} aria-labelledby="para-pts-title">
+      <div className={styles.texture} aria-hidden="true">
+        <img ref={topo} src={topoLines} alt="" className={styles.topo} />
+      </div>
       <div className={styles.frame}>
         <div className={styles.copy}>
           <p className={styles.kicker} data-reveal>

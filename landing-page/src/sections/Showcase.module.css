@@ -1,0 +1,281 @@
+.showcase {
+  position: relative;
+  z-index: 0;
+  isolation: isolate; /* keep the 3D pop-outs below the fixed nav */
+}
+.anchor {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+}
+.sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---------- Hero layer ---------- */
+.heroBg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(150, 160, 178, 0.1), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 255, 255, 0.025), transparent 60%);
+}
+/* Soft floor so the cropped phone fades out at the bottom edge. */
+.heroBg::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 4;
+  height: 96px;
+  background: linear-gradient(180deg, rgba(11, 12, 14, 0), var(--color-bg));
+}
+
+.heroLayer {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 1;
+  will-change: transform, opacity;
+}
+
+.heroChrome {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  pointer-events: none;
+}
+/* The entrance fade lives on an inner box: a CSS animation would override the
+   opacity the scroll handler writes on the outer one. */
+.heroChromeInner {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: fadeIn 1s ease 1.2s forwards;
+}
+.scrollCue,
+.storyIndex {
+  position: absolute;
+  bottom: 40px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--color-text-muted);
+}
+.scrollCue {
+  left: var(--page-gutter);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.mouse {
+  width: 22px;
+  height: 34px;
+  border: 1px solid #3a3f49;
+  border-radius: 11px;
+  display: flex;
+  justify-content: center;
+  padding-top: 7px;
+}
+.mouse span {
+  width: 2px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--color-volt);
+  animation: wheel 1.8s var(--ease-in-out) infinite;
+}
+.storyIndex {
+  right: var(--page-gutter);
+  bottom: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.ticks {
+  display: flex;
+  gap: 6px;
+}
+.ticks span {
+  width: 24px;
+  height: 2px;
+  background: var(--color-border-strong);
+}
+.ticks span[data-active='true'] {
+  background: var(--color-text);
+}
+
+/* ---------- Story layer ---------- */
+
+.frame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--nav-height) var(--page-gutter) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 521px) 1fr;
+  align-items: center;
+  pointer-events: none;
+}
+.copyStack {
+  display: grid;
+  pointer-events: auto;
+}
+.copyStack > .copy {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+  opacity: 0;
+  visibility: hidden;
+  will-change: opacity, transform;
+}
+.stage {
+  position: relative;
+  height: 100%;
+}
+/* Out of flow on purpose: a 780px box would set the row height and push the
+   copy down on short screens (scale() doesn't shrink layout size). */
+.slot {
+  --rig-scale: 1;
+  position: absolute;
+  top: 50%;
+  right: 80px; /* rig's right edge sits 160px from the 1440 frame edge, as in Figma */
+  width: 461px;
+  height: 780px;
+  margin-top: -390px;
+  transform: scale(var(--rig-scale));
+}
+.rail {
+  position: absolute;
+  right: calc(var(--page-gutter) / 2);
+  top: 50%;
+  width: 1px;
+  height: 160px;
+  margin-top: -80px;
+  background: var(--color-border);
+  opacity: 0;
+}
+.rail span {
+  position: absolute;
+  inset: 0;
+  background: var(--color-volt);
+  transform-origin: top;
+  transform: scaleY(0);
+}
+
+/* ---------- The one phone ---------- */
+.world {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.entrance {
+  position: absolute;
+  inset: 0;
+  perspective: 1700px;
+  transform-style: preserve-3d;
+  animation: phoneIn 1.6s var(--ease-out) 0.35s both;
+}
+.rig {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 461px;
+  height: 780px;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.phone {
+  position: absolute !important;
+  left: 81px;
+  top: 20px;
+}
+.screenLayer {
+  position: absolute;
+  inset: 0;
+  will-change: opacity;
+}
+.dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(8, 9, 11);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes phoneIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 220px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes wheel {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(9px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+
+/* Short viewports (laptops with a small window, an embedded preview): tighten
+   the stage copy so it fits between the nav and the bottom edge. */
+@media (max-height: 760px) {
+  .copyStack > .copy {
+    gap: 18px;
+  }
+  .copyStack h2 {
+    font-size: min(3.9vw, 7vh);
+  }
+  .copyStack p {
+    font-size: 16px;
+    line-height: 24px;
+  }
+  .copyStack li {
+    height: 38px;
+  }
+}
+@media (max-height: 600px) {
+  .copyStack > .copy {
+    gap: 12px;
+  }
+  .copyStack ul {
+    display: none;
+  }
+}
+@media (max-width: 1240px) {
+  .slot {
+    right: 0;
+  }
+}
+@media (max-width: 1100px) {
+  .heroChrome {
+    display: none;
+  }
+}
