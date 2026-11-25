@@ -14,7 +14,9 @@ import { Icon, type IconName } from '@/components/Icon';
 import { haptics } from '@/lib/haptics';
 import { colors, fonts } from '@/theme/tokens';
 
-const tabs: Record<string, { label: string; icon: IconName }> = {
+export type TabItems = Record<string, { label: string; icon: IconName }>;
+
+export const clientTabs: TabItems = {
   today: { label: 'Hoje', icon: 'tabToday' },
   train: { label: 'Treinar', icon: 'tabTrain' },
   nutrition: { label: 'Nutrição', icon: 'tabNutrition' },
@@ -22,8 +24,22 @@ const tabs: Record<string, { label: string; icon: IconName }> = {
   profile: { label: 'Perfil', icon: 'tabProfile' },
 };
 
-/** "Mobile/Barra de navegação · Cliente" — Volt only on the active glyph. */
-export function TabBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
+export const trainerTabs: TabItems = {
+  home: { label: 'Início', icon: 'ptTabHome' },
+  students: { label: 'Alunos', icon: 'ptTabStudents' },
+  plans: { label: 'Planos', icon: 'ptTabPlans' },
+  messages: { label: 'Mensagens', icon: 'ptTabMessages' },
+  earnings: { label: 'Ganhos', icon: 'ptTabEarnings' },
+};
+
+/** "Mobile/Barra de navegação" (Cliente / PT) — Volt only on the active glyph. */
+export function TabBar({
+  state,
+  emitter,
+  navigateToTab,
+  insets,
+  items,
+}: BottomTabBarProps & { items: TabItems }) {
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {Platform.OS === 'ios' ? (
@@ -31,7 +47,7 @@ export function TabBar({ state, emitter, navigateToTab, insets }: BottomTabBarPr
       ) : null}
       <View style={[StyleSheet.absoluteFill, styles.tint]} />
       {state.routes.map((route, index) => {
-        const tab = tabs[route.name];
+        const tab = items[route.name];
         if (!tab) return null;
         const focused = index === state.index;
         return (

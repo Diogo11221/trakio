@@ -1,7 +1,8 @@
-# Trakio — App mobile (cliente)
+# Trakio — App mobile (cliente e PT)
 
-App do cliente em **Expo SDK 58 + React Native 0.88 + Expo Router**, construída a partir da página
-"04 · App · Cliente" do Figma _Trakio — Design_.
+App do cliente e do Personal Trainer em **Expo SDK 58 + React Native 0.88 + Expo Router**, construída a
+partir das páginas "04 · App · Cliente" e "05 · App · PT" do Figma _Trakio — Design_. Em Boas-vindas,
+"Sou Personal Trainer" abre a app do PT.
 
 ## Correr
 
@@ -29,8 +30,10 @@ src/
     workout-done       resumo
     meal-log           registo de refeição com IA (modal)
     trainers/          marketplace de PTs
+    pt/                app do PT: Início · Alunos · Planos · Mensagens · Ganhos,
+                       aluno, editor de plano, conversa, verificar perfil
   components/          design system (texto, botões, sheet, anel, segmented…)
-  features/            workout · nutrition · marketplace · profile
+  features/            workout · nutrition · marketplace · profile · pt
   lib/                 haptics, formatação pt-PT, useNow
   state/               preferências (vibração, alerta, Premium)
   theme/tokens.ts      espelho das variáveis "Trakio Tokens" do Figma

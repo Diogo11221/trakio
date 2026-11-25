@@ -43,6 +43,13 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#D4FF00"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Trakio usa as tuas fotografias para as enviares ao teu PT ou aluno.",
+          "cameraPermission": "O Trakio usa a câmara para fotografares refeições e enviares fotos ao teu PT ou aluno."
+        }
       ]
     ],
     "experiments": {

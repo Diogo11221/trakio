@@ -1,0 +1,117 @@
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+
+import { AppText } from '@/components/AppText';
+import { Icon } from '@/components/Icon';
+import { Portrait } from '@/components/Portrait';
+import { PressableScale } from '@/components/PressableScale';
+import { Reveal, Screen } from '@/components/Screen';
+import { lastMessagePreview } from '@/features/pt/data';
+import { useTrainer } from '@/features/pt/store';
+import { refreshMockData } from '@/lib/refresh';
+import { layoutGlide } from '@/theme/motion';
+import { colors, fonts } from '@/theme/tokens';
+
+/** PT · Mensagens. */
+export default function Messages() {
+  const { conversations } = useTrainer();
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const list = conversations.filter((c) => !q || c.name.toLowerCase().includes(q));
+
+  return (
+    <Screen gap={16} onRefresh={refreshMockData}>
+      <Reveal index={0}>
+        <AppText variant="title">Mensagens</AppText>
+      </Reveal>
+
+      <Reveal index={1} style={styles.search}>
+        <Icon name="search" size={16} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Procurar conversa"
+          placeholderTextColor={colors.textMuted}
+          selectionColor={colors.volt}
+          keyboardAppearance="dark"
+          style={styles.searchInput}
+          accessibilityLabel="Procurar conversa"
+        />
+      </Reveal>
+
+      <Reveal index={2}>
+        {list.map((conversation) => {
+          const unread = conversation.unread > 0;
+          return (
+            <Animated.View key={conversation.id} layout={layoutGlide}>
+              <PressableScale
+                onPress={() => router.push({ pathname: '/pt/chat/[id]', params: { id: conversation.id } })}
+                pressedScale={0.985}
+                accessibilityLabel={`${conversation.name}${unread ? `, ${conversation.unread} por ler` : ''}`}
+              >
+                <View style={styles.row}>
+                  <Portrait person={conversation.id} size={48} />
+                  <View style={styles.flex}>
+                    <View style={styles.line}>
+                      <AppText style={[styles.name, unread && styles.nameUnread]}>{conversation.name}</AppText>
+                      <AppText variant="caption" tone={unread ? 'volt' : 'muted'}>
+                        {conversation.time}
+                      </AppText>
+                    </View>
+                    <View style={styles.line}>
+                      <AppText
+                        variant="small"
+                        tone={unread ? 'default' : 'muted'}
+                        numberOfLines={1}
+                        style={styles.preview}
+                      >
+                        {lastMessagePreview(conversation)}
+                      </AppText>
+                      {unread ? (
+                        <View style={styles.badge}>
+                          <AppText style={styles.badgeText}>{conversation.unread}</AppText>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+              </PressableScale>
+            </Animated.View>
+          );
+        })}
+      </Reveal>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, gap: 3 },
+  search: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+  },
+  searchInput: { flex: 1, height: '100%', fontFamily: fonts.ui, fontSize: 14, color: colors.text },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  line: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  name: { fontFamily: fonts.uiMedium, fontSize: 15, color: colors.text },
+  nameUnread: { fontFamily: fonts.uiSemiBold },
+  preview: { flex: 1 },
+  badge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.volt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { fontFamily: fonts.uiSemiBold, fontSize: 11, color: colors.bg },
+});

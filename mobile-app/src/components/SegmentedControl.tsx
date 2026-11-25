@@ -13,6 +13,8 @@ type SegmentedControlProps<T extends string> = {
   size?: 'sm' | 'md';
   /** Glass look used over the 3D exercise demo. */
   glass?: boolean;
+  /** Full-width with equal segments and a dark raised thumb (Planos). */
+  stretch?: boolean;
   style?: ViewStyle;
 };
 
@@ -23,6 +25,7 @@ export function SegmentedControl<T extends string>({
   onChange,
   size = 'md',
   glass = false,
+  stretch = false,
   style,
 }: SegmentedControlProps<T>) {
   const [layouts, setLayouts] = useState<Partial<Record<T, LayoutRectangle>>>({});
@@ -45,11 +48,14 @@ export function SegmentedControl<T extends string>({
         styles.track,
         sm ? styles.trackSm : styles.trackMd,
         glass ? styles.glass : styles.solid,
+        stretch && styles.stretch,
         style,
       ]}
       accessibilityRole="tablist"
     >
-      <Animated.View style={[styles.thumb, sm ? styles.thumbSm : styles.thumbMd, thumbStyle]} />
+      <Animated.View
+        style={[styles.thumb, sm ? styles.thumbSm : styles.thumbMd, stretch && styles.thumbRaised, thumbStyle]}
+      />
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -66,13 +72,13 @@ export function SegmentedControl<T extends string>({
               haptics.tick();
               onChange(option.value);
             }}
-            style={sm ? styles.segmentSm : styles.segmentMd}
+            style={[sm ? styles.segmentSm : styles.segmentMd, stretch && styles.segmentStretch]}
           >
             <AppText
               style={{
                 fontFamily: fonts.uiMedium,
-                fontSize: sm ? 11 : 12,
-                color: selected ? colors.bg : colors.textMuted,
+                fontSize: sm ? 11 : stretch ? 13 : 12,
+                color: selected ? (stretch ? colors.text : colors.bg) : colors.textMuted,
               }}
             >
               {option.label}
@@ -95,4 +101,7 @@ const styles = StyleSheet.create({
   thumbMd: { top: 3, bottom: 3, borderRadius: 6 },
   segmentSm: { paddingHorizontal: 8, paddingVertical: 4 },
   segmentMd: { paddingHorizontal: 9, paddingVertical: 4 },
+  stretch: { alignSelf: 'stretch', borderRadius: 12 },
+  thumbRaised: { backgroundColor: colors.surfaceRaised, borderRadius: 9 },
+  segmentStretch: { flex: 1, alignItems: 'center', paddingVertical: 8 },
 });

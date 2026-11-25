@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
-import { Icon } from '@/components/Icon';
+import { Checkbox } from '@/components/Checkbox';
 import { Sheet } from '@/components/Sheet';
 import { Pill } from '@/components/Surface';
 import { haptics } from '@/lib/haptics';
@@ -73,51 +72,8 @@ export function ManageSubscriptionSheet({ visible, onClose, onCancelled }: Props
   );
 }
 
-function Checkbox({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
-  const on = useSharedValue(checked ? 1 : 0);
-  useEffect(() => {
-    on.set(withTiming(checked ? 1 : 0, { duration: 180 }));
-  }, [checked, on]);
-  const boxStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(on.get(), [0, 1], ['rgba(212,255,0,0)', colors.volt]),
-    borderColor: interpolateColor(on.get(), [0, 1], [colors.borderStrong, colors.volt]),
-  }));
-  const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: Math.max(0, on.get()) }], opacity: on.get() }));
-
-  return (
-    <Pressable
-      onPress={() => {
-        haptics.tick();
-        onToggle();
-      }}
-      style={styles.check}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-    >
-      <Animated.View style={[styles.checkBox, boxStyle]}>
-        <Animated.View style={tickStyle}>
-          <Icon name="checkDark" size={14} />
-        </Animated.View>
-      </Animated.View>
-      <AppText variant="small" style={styles.checkLabel}>
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   header: { gap: 6 },
   body: { fontFamily: fonts.ui, lineHeight: 20 },
   box: { backgroundColor: colors.surfaceRaised, borderRadius: 16, padding: 14, gap: 6 },
-  check: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  checkBox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkLabel: { flex: 1 },
 });

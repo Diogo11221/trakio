@@ -150,7 +150,7 @@ export function Screen({
   );
 }
 
-/** Staggered entrance for stacked sections — calm fade + 12 pt rise, 50 ms apart. */
+/** Staggered entrance for stacked sections — calm fade + short rise, 50 ms apart. */
 export function Reveal({
   index = 0,
   children,
