@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router';
 import logoRing from '../assets/figma/logo-ring.svg';
 import { useAdmin } from '../data/store';
 import { Icon, type IconName } from './Icon';
-import { Portrait } from './Portrait';
+import { Photo } from './Photo';
 import { Toast } from './ui';
 import s from './Layout.module.css';
 
@@ -19,7 +19,8 @@ const nav: { to: string; label: string; icon: IconName; badge?: 'verification' |
 
 /** Backoffice shell: fixed sidebar (Figma "Sidebar") + page. */
 export function Layout() {
-  const { pendingVerifications, openReports } = useAdmin();
+  const { pendingVerifications, openReports, session, signOut } = useAdmin();
+  const email = session.status === 'signedIn' ? session.me.email : '';
   const location = useLocation();
   const counts = { verification: pendingVerifications, reports: openReports };
 
@@ -56,10 +57,12 @@ export function Layout() {
         </nav>
         <div className={s.spacer} />
         <div className={s.me}>
-          <Portrait person="marta" size={34} />
-          <div>
-            <div className={s.meName}>Marta Neves</div>
-            <div className={s.meRole}>Equipa Trakio</div>
+          <Photo url={null} name={email} size={34} />
+          <div style={{ minWidth: 0 }}>
+            <div className={s.meName} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{email}</div>
+            <button type="button" className={s.meRole} onClick={() => signOut()} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
+              Terminar sessão
+            </button>
           </div>
         </div>
       </aside>

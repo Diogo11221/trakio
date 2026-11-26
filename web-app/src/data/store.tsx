@@ -1,102 +1,65 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import {
-  exercises as initialExercises,
-  payments as initialPayments,
-  reports as initialReports,
-  users as initialUsers,
-  verificationQueue,
-  type DemoStatus,
-  type Exercise,
-  type Payment,
-  type PaymentStatus,
-  type Report,
-  type UserRow,
-  type UserStatus,
-  type VerificationRequest,
-} from './mock';
+import { api, hasStoredSession, onExpired, refresh, signIn as apiSignIn, signOut as apiSignOut, type Me } from '../api';
+import type { Overview } from './types';
 
-export type VerificationOutcome = 'approved' | 'refused' | 'info-requested';
+type Session = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; me: Me };
 
-type AdminState = {
-  verification: { request: VerificationRequest; outcome: VerificationOutcome | null; note: string }[];
-  payments: Payment[];
-  users: UserRow[];
-  reports: { report: Report; resolution: string | null }[];
-  exercises: Exercise[];
-  toast: { id: number; text: string } | null;
-};
-
-type AdminContextValue = AdminState & {
+type AdminContextValue = {
+  session: Session;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  /** Sidebar badges, refreshed after every decision. */
   pendingVerifications: number;
   openReports: number;
-  decideVerification: (id: string, outcome: VerificationOutcome) => void;
-  setVerificationNote: (id: string, note: string) => void;
-  setPaymentStatus: (id: string, status: PaymentStatus) => void;
-  setUserStatus: (id: string, status: UserStatus) => void;
-  resolveReport: (id: string, resolution: string) => void;
-  addExercise: (exercise: Omit<Exercise, 'id' | 'usedIn' | 'demo'>) => void;
-  setDemoStatus: (id: string, demo: DemoStatus) => void;
+  refreshCounts: () => void;
+  toast: { id: number; text: string } | null;
   notify: (text: string) => void;
 };
 
 const AdminContext = createContext<AdminContextValue | null>(null);
 
 export function AdminProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AdminState>({
-    verification: verificationQueue.map((request) => ({ request, outcome: null, note: '' })),
-    payments: initialPayments,
-    users: initialUsers,
-    reports: initialReports.map((report) => ({ report, resolution: null })),
-    exercises: initialExercises,
-    toast: null,
-  });
+  const [session, setSession] = useState<Session>(() => (hasStoredSession() ? { status: 'loading' } : { status: 'signedOut' }));
+  const [counts, setCounts] = useState({ pendingVerifications: 0, openReports: 0 });
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
 
-  const notify = useCallback((text: string) => {
-    setState((s) => ({ ...s, toast: { id: Date.now(), text } }));
+  useEffect(() => {
+    if (hasStoredSession()) {
+      refresh().then((me) => setSession(me ? { status: 'signedIn', me } : { status: 'signedOut' }));
+    }
+    return onExpired(() => setSession({ status: 'signedOut' }));
   }, []);
+
+  const refreshCounts = useCallback(() => {
+    api
+      .get<Overview>('/api/v1/admin/overview')
+      .then((o) => setCounts({ pendingVerifications: o.pendingVerifications, openReports: o.openReports }))
+      .catch(() => undefined);
+  }, []);
+
+  const signedIn = session.status === 'signedIn';
+  useEffect(() => {
+    if (signedIn) refreshCounts();
+  }, [refreshCounts, signedIn]);
 
   const value = useMemo<AdminContextValue>(
     () => ({
-      ...state,
-      pendingVerifications: state.verification.filter((v) => v.outcome === null || v.outcome === 'info-requested').length,
-      openReports: state.reports.filter((r) => r.resolution === null).length,
-      decideVerification: (id, outcome) =>
-        setState((s) => ({
-          ...s,
-          verification: s.verification.map((v) => (v.request.id === id ? { ...v, outcome } : v)),
-          // An approved PT shows up as active in Utilizadores straight away.
-          users:
-            outcome === 'approved'
-              ? s.users.map((u) =>
-                  u.person === id ? { ...u, status: 'active', plan: 'Verificado · no marketplace' } : u,
-                )
-              : s.users,
-        })),
-      setVerificationNote: (id, note) =>
-        setState((s) => ({
-          ...s,
-          verification: s.verification.map((v) => (v.request.id === id ? { ...v, note } : v)),
-        })),
-      setPaymentStatus: (id, status) =>
-        setState((s) => ({ ...s, payments: s.payments.map((p) => (p.id === id ? { ...p, status } : p)) })),
-      setUserStatus: (id, status) =>
-        setState((s) => ({ ...s, users: s.users.map((u) => (u.id === id ? { ...u, status } : u)) })),
-      resolveReport: (id, resolution) =>
-        setState((s) => ({
-          ...s,
-          reports: s.reports.map((r) => (r.report.id === id ? { ...r, resolution } : r)),
-        })),
-      addExercise: (exercise) =>
-        setState((s) => ({
-          ...s,
-          exercises: [{ ...exercise, id: `e-${s.exercises.length + 1}`, demo: 'todo', usedIn: 0 }, ...s.exercises],
-        })),
-      setDemoStatus: (id, demo) =>
-        setState((s) => ({ ...s, exercises: s.exercises.map((e) => (e.id === id ? { ...e, demo } : e)) })),
-      notify,
+      session,
+      signIn: async (email, password) => {
+        const me = await apiSignIn(email, password);
+        setSession({ status: 'signedIn', me });
+      },
+      signOut: async () => {
+        await apiSignOut();
+        setSession({ status: 'signedOut' });
+      },
+      ...counts,
+      refreshCounts,
+      toast,
+      notify: (text) => setToast({ id: Date.now(), text }),
     }),
-    [notify, state],
+    [counts, refreshCounts, session, toast],
   );
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
@@ -106,4 +69,24 @@ export function useAdmin(): AdminContextValue {
   const ctx = useContext(AdminContext);
   if (!ctx) throw new Error('useAdmin must be used inside <AdminProvider>');
   return ctx;
+}
+
+/** GET a path and keep the result; `reload` after a change. */
+export function useApi<T>(path: string | null) {
+  const [state, setState] = useState<{ path: string | null; data: T | null; error: string | null }>({ path: null, data: null, error: null });
+  const load = useCallback(
+    () =>
+      path
+        ? api
+            .get<T>(path)
+            .then((data) => setState({ path, data, error: null }))
+            .catch((e: Error) => setState({ path, data: null, error: e.message }))
+        : Promise.resolve(),
+    [path],
+  );
+  useEffect(() => {
+    load();
+  }, [load]);
+  const current = state.path === path ? state : { data: null, error: null };
+  return { data: current.data, error: current.error, loading: path !== null && state.path !== path, reload: load };
 }
