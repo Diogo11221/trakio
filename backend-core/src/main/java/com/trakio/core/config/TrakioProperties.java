@@ -21,7 +21,16 @@ public record TrakioProperties(
         @Valid @NotNull Storage storage,
         @Valid @NotNull Payments payments,
         @Valid @NotNull RateLimit rateLimit,
-        @Valid BootstrapAdmin bootstrapAdmin) {
+        @Valid BootstrapAdmin bootstrapAdmin,
+        @Valid @NotNull Ai ai) {
+
+    /** backend-ai (internal). Empty URL = AI off: simple fallbacks are used instead. */
+    public record Ai(String baseUrl, String token, @NotNull Duration timeout) {
+
+        public boolean enabled() {
+            return baseUrl != null && !baseUrl.isBlank() && token != null && token.length() >= 32;
+        }
+    }
 
     public record Jwt(
             /** Base64 HMAC key, at least 256 bits. */

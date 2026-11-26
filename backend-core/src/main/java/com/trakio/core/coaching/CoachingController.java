@@ -19,9 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 class CoachingController {
 
     private final CoachingService coaching;
+    private final SuggestionActionService actions;
 
-    CoachingController(CoachingService coaching) {
+    CoachingController(CoachingService coaching, SuggestionActionService actions) {
         this.coaching = coaching;
+        this.actions = actions;
     }
 
     /** The client stops training with their PT (or abandons a checkout). */
@@ -40,6 +42,18 @@ class CoachingController {
     @GetMapping("/api/v1/trainer/students/{clientId}")
     StudentDetail student(@AuthenticationPrincipal AuthUser me, @PathVariable UUID clientId) {
         return coaching.student(me.id(), clientId);
+    }
+
+    record DecisionInput(@jakarta.validation.constraints.NotNull AiDecision.Decision decision,
+            @jakarta.validation.constraints.Size(max = 120) String exercise) {}
+
+    /** Apply or ignore an AI suggestion ({@code kind}: light-week, home-workout, variation). */
+    @PostMapping("/api/v1/trainer/students/{clientId}/suggestions/{kind}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void decide(@AuthenticationPrincipal AuthUser me, @PathVariable UUID clientId, @PathVariable String kind,
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody DecisionInput input) {
+        actions.decide(me.id(), clientId, com.trakio.core.common.Enums.parse(AiDecision.Kind.class, kind, "kind"), input.decision(),
+                input.exercise());
     }
 
     @PostMapping("/api/v1/trainer/students/{clientId}/end")

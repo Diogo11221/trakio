@@ -186,6 +186,29 @@ public class PlanService {
         return view(saved);
     }
 
+    /** "Semana leve": the student's own copy of their plan with one set fewer per exercise (at least one). */
+    @Transactional
+    public PlanView lighterWeek(UUID trainerId, UUID clientId, String message) {
+        coaching.requireActiveStudent(trainerId, clientId);
+        WorkoutPlan current = planFor(clientId);
+        WorkoutPlan copy = plans.findByOwnerIdAndClientId(trainerId, clientId)
+                .orElseGet(() -> new WorkoutPlan(trainerId, clientId, current.getName(), current.getWeeks(), current.getWorkoutsPerWeek()));
+        List<PlanDay> days = new ArrayList<>();
+        for (PlanDay d : current.getDays()) {
+            PlanDay day = new PlanDay(d.getPosition(), d.getLabel(), d.getFocus());
+            for (PlanExercise e : d.getExercises()) {
+                day.addExercise(new PlanExercise(e.getPosition(), e.getExercise(), Math.max(1, e.getSets() - 1), e.getRepsMin(),
+                        e.getRepsMax(), e.getRestSeconds(), e.getReferenceKg(), e.getNote()));
+            }
+            days.add(day);
+        }
+        copy.replaceDays(days);
+        WorkoutPlan saved = plans.saveAndFlush(copy);
+        clients.findByUserId(clientId).ifPresent(c -> c.setPlanId(saved.getId()));
+        notifyStudent(trainerId, clientId, message);
+        return view(saved);
+    }
+
     private void notifyStudent(UUID trainerId, UUID clientId, String message) {
         if (message != null && !message.isBlank()) {
             chat.postFromTrainer(trainerId, clientId, message.trim());
