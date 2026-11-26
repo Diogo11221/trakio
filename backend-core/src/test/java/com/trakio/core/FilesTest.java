@@ -45,6 +45,23 @@ class FilesTest extends IntegrationTest {
         assertThat(response.getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
     }
 
+    @Test
+    void signedLinksOpenAFileForFiveMinutesAndNothingElse() throws Exception {
+        Session s = client();
+        UUID id = upload(s, "chat", "plano.pdf", pdf());
+        call(get("/api/v1/files/" + id), null, null, 401);
+        call(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/files/" + id + "/link"), client(), null, 404);
+        String url = call(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/files/" + id + "/link"), s, null, 200)
+                .get("url").asText();
+        assertThat(mvc.perform(get(url)).andReturn().getResponse().getStatus()).isEqualTo(200);
+        // Tampered or reused for another file: refused.
+        assertThat(mvc.perform(get(url.replace("sig=", "sig=x"))).andReturn().getResponse().getStatus()).isEqualTo(401);
+        UUID other = upload(s, "chat", "outro.pdf", pdf());
+        assertThat(mvc.perform(get(url.replace(id.toString(), other.toString()))).andReturn().getResponse().getStatus()).isEqualTo(401);
+        String expired = url.replaceAll("exp=\\d+", "exp=" + (System.currentTimeMillis() / 1000 - 10));
+        assertThat(mvc.perform(get(expired)).andReturn().getResponse().getStatus()).isEqualTo(401);
+    }
+
     private String download(Session s, UUID id) throws Exception {
         var response = mvc.perform(get("/api/v1/files/" + id).header("Authorization", "Bearer " + s.token())).andReturn().getResponse();
         assertThat(response.getStatus()).isEqualTo(200);

@@ -12,4 +12,4 @@ trakio:
   payments:
     provider: ${TRAKIO_PAYMENTS_PROVIDER:fake}
   cors:
-    allowed-origins: ${TRAKIO_CORS_ORIGINS:http://localhost:5173,http://localhost:8081,http://localhost:19006}
+    allowed-origins: ${TRAKIO_CORS_ORIGINS:http://localhost:5174,http://localhost:8081,http://localhost:19006}

@@ -44,6 +44,15 @@ class ListingsTest extends IntegrationTest {
         call(get("/api/v1/admin/payments"), admin, null, 200);
         call(get("/api/v1/admin/payments?status=refund-requested&kind=coaching"), admin, null, 200);
         call(get("/api/v1/admin/reports"), admin, null, 200);
+        call(get("/api/v1/admin/reports?status=resolved"), admin, null, 200);
+        call(get("/api/v1/admin/verifications?status=approved"), admin, null, 200);
+        call(get("/api/v1/admin/verifications?status=refused"), admin, null, 200);
+        assertThat(call(get("/api/v1/admin/users/totals"), admin, null, 200).get("all").asLong()).isPositive();
+        JsonNode settings = call(get("/api/v1/admin/settings"), admin, null, 200);
+        assertThat(settings.get("platformFeePercent").asInt()).isEqualTo(10);
+        assertThat(settings.findValuesAsString("email")).contains(admin.email());
+        assertThat(call(get("/api/v1/admin/exercises/demo-totals"), admin, null, 200).has("ready")).isTrue();
+        call(get("/api/v1/admin/settings"), c, null, 403);
         call(get("/api/v1/admin/exercises"), admin, null, 200);
         JsonNode created = call(post("/api/v1/admin/exercises"), admin,
                 Map.of("name", "Elevação pélvica unilateral", "group", "legs", "muscles", "Glúteos", "equipment", "Banco"), 201);

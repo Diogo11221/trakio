@@ -218,7 +218,8 @@ public class CoachingService {
         Instant now = clock.instant();
         long days = Duration.between(rel.getStartedAt(), now).toDays();
         int week = (int) Math.min(load.weeks(), days / 7 + 1);
-        Double adherence = load.expected() == 0 ? null : Math.min(1.0, (double) load.done() / load.expected());
+        // In the first week there's nothing fair to measure yet.
+        Double adherence = days < 7 || load.expected() == 0 ? null : Math.min(1.0, (double) load.done() / load.expected());
         var top = result.suggestions().isEmpty() ? null : result.suggestions().getFirst();
         String tag = top != null ? "attention" : days < 7 ? "new" : null;
         return new StudentView(rel.getClientId(), rel.getId(), profile.getName(), FileService.url(profile.getPhotoFileId()),

@@ -67,7 +67,7 @@ trakio:
     access-token-ttl: 15m
     refresh-token-ttl: 30d
   cors:
-    allowed-origins: ${TRAKIO_CORS_ORIGINS:http://localhost:5173,http://localhost:8081}
+    allowed-origins: ${TRAKIO_CORS_ORIGINS:http://localhost:5174,http://localhost:8081}
   storage:
     local-dir: ${TRAKIO_STORAGE_DIR:./data/uploads}
     max-file-bytes: 10485760

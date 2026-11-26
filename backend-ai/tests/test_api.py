@@ -48,8 +48,26 @@ def test_insights_explain_themselves():
     }
     r = client.post("/v1/insights", json=body, headers=TOKEN).json()
     kinds = [s["kind"] for s in r["suggestions"]]
-    assert kinds == ["light-week", "home-workout", "variation"]
-    assert "4 de 12" in r["suggestions"][1]["body"]
+    # Skipping workouts: no "lighter week" on top of it.
+    assert kinds == ["home-workout", "variation"]
+    assert "4 de 12" in r["suggestions"][0]["body"]
+
+
+def test_a_real_load_spike_suggests_a_lighter_week():
+    steady_weeks = sessions([8, 10, 12, 15, 17, 19, 22, 24, 26], volume=4000)
+    spike = sessions([0.2, 1, 2, 3, 4], volume=9000, feeling="max")
+    body = {"first_name": "Rui", "now": NOW.isoformat(), "sessions": steady_weeks + spike,
+            "workouts_done": 14, "workouts_expected": 12, "stalled_exercises": []}
+    r = client.post("/v1/insights", json=body, headers=TOKEN).json()
+    assert [s["kind"] for s in r["suggestions"]] == ["light-week"]
+    assert "subiu" in r["suggestions"][0]["body"]
+
+
+def test_newcomers_are_not_compared_with_weeks_before_they_started():
+    newcomer = sessions([1, 4, 8], volume=5000)
+    r = client.post("/v1/readiness", json={"now": NOW.isoformat(), "sessions": newcomer}, headers=TOKEN).json()
+    assert r["acwr"] < 1.5
+    assert r["level"] != "rest"
 
 
 class FakeAnthropic:

@@ -1,7 +1,8 @@
 # Trakio — backend-core
 
 API da Trakio em **Java 25 + Spring Boot 4.2**, **PostgreSQL** e **Flyway**. Serve a app mobile (cliente e PT),
-o backoffice web e os pagamentos (Stripe). A IA/ML fica no `backend-ai`.
+o backoffice web e os pagamentos (Stripe). A IA/ML corre no `backend-ai` (interno), chamado daqui; quando não
+está disponível, cada funcionalidade tem uma alternativa simples e a app continua a funcionar.
 
 A API segue a forma dos providers da app (`features/auth/localAuth.ts`, `workout/history.tsx`,
 `nutrition/diary.tsx`, `state/chat.tsx`, `pt/store.tsx`) e do admin (`web-app/src/data/store.tsx`): trocar os
@@ -19,13 +20,15 @@ cd backend-core
 SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-O perfil **`dev`** usa pagamentos falsos (tudo é pago na hora) e cria as contas de teste da app, com a
-palavra-passe `trakio123`: `miguel@trakio.test` (aluno da Rita, Premium, 8 semanas de treinos),
-`rita@trakio.test` (PT), `ana@trakio.test`, `tiago@`, `bruno@`, `ines@` (verificação pendente) e
+O perfil **`dev`** usa pagamentos falsos (tudo é pago na hora) e cria dados de demonstração com fotos reais,
+palavra-passe `trakio123`: `miguel@trakio.test` (aluno da Rita, Premium, 8 semanas de treinos, refeições de
+hoje), `rita@trakio.test` (PT com 7 alunos, agenda de hoje, pagamentos), os alunos `ana@` (falta aos treinos),
+`joao@` (peso morto romeno estagnado), `carla@`, `pedro@`, `sofia@` (pediu reembolso), `tomas@`, os PTs
+`tiago@`, `bruno@`, `ines@` (verificação por rever), `marco@` (deixou uma avaliação denunciada) e
 `admin@trakio.test`. Nunca uses `dev` em produção: com o perfil `prod` os pagamentos falsos recusam arrancar.
 
 ```bash
-./mvnw test     # 45 testes de integração contra PostgreSQL real (binários embebidos, sem Docker)
+./mvnw test     # 54 testes de integração contra PostgreSQL real (binários embebidos, sem Docker)
 ```
 
 ## Configuração
@@ -42,6 +45,7 @@ arranca fora de `dev`.
 | `TRAKIO_PAYMENTS_PROVIDER` | `stripe` (por omissão) ou `fake` (só `dev`) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PREMIUM_PRICE_ID`, `STRIPE_MARKETPLACE_PRICE_ID` | Stripe |
 | `TRAKIO_STORAGE_DIR` | onde ficam os ficheiros enviados |
+| `TRAKIO_AI_URL`, `TRAKIO_AI_TOKEN` | `backend-ai` (vazio = IA desligada, alternativas simples) |
 | `TRAKIO_FORWARD_HEADERS` | `native` atrás de um proxy (para o IP real nos limites de pedidos) |
 
 ## Segurança
@@ -65,6 +69,11 @@ arranca fora de `dev`.
   Cancelar exige `{"confirm": true}`: nunca é um interruptor.
 - **Uploads**: o tipo é detetado pelos bytes (JPEG, PNG, PDF), não pelo nome; o EXIF/metadados das fotos (que
   podem ter a localização GPS) é removido; nomes aleatórios no disco; servidos com `nosniff`, PDFs como anexo.
+  Para abrir um PDF no browser do telemóvel há ligações assinadas (HMAC) de 5 minutos, pedidas por quem já
+  tem acesso ao ficheiro.
+- **IA**: o `backend-ai` não é exposto; fala-se com ele por rede interna e segredo partilhado. O Premium é
+  verificado aqui antes de qualquer pedido de IA, o áudio de voz não é guardado, e uma estimativa de refeição
+  nunca é gravada sem confirmação.
 - **Pedidos**: validação `jakarta.validation` em todos os DTOs (as entidades nunca saem da API), corpo JSON
   limitado a 256 KB, erros em RFC 9457 sem detalhes internos, cabeçalhos de segurança (CSP `default-src
   'none'`, HSTS, `X-Frame-Options: DENY`, `no-store`), CORS fechado à lista configurada, só `/actuator/health`
@@ -82,16 +91,18 @@ em UTC, dias (`day`) no calendário de Lisboa. Erros: `application/problem+json`
 | --- | --- |
 | Sessão | `POST auth/sign-up`, `auth/sign-in`, `auth/refresh`, `auth/sign-out` · `POST me/password` · `DELETE me` |
 | Conta | `GET me` · `PUT me/profile` (`kind: client \| trainer`) · `PUT me/preferences` |
-| Ficheiros | `POST files` (multipart, `purpose=avatar\|chat\|meal\|verification`) · `GET files/{id}` |
+| Ficheiros | `POST files` (multipart, `purpose=avatar\|chat\|meal\|verification`) · `GET files/{id}` · `POST files/{id}/link` (5 min) |
 | Treino | `GET exercises` · `GET plans/templates` · `GET plans/{id}` · `GET/PUT me/plan` · `GET/POST me/workouts` (idempotente por `clientRef`) · `GET/PUT/DELETE me/live-workout` |
 | Progresso | `GET/POST me/weights`, `DELETE me/weights/{id}` · `GET me/progress?weeks=8` |
-| Nutrição | `GET foods?q=` · `POST nutrition/parse` · `GET me/meals?day=` · `POST me/meals` · `DELETE me/meals/{id}` |
+| Nutrição | `GET foods?q=` · `POST nutrition/parse` · `GET me/meals?day=` · `POST me/meals` · `DELETE me/meals/{id}` · `POST me/meals/ai-estimate` (Premium: texto e/ou foto) · `POST me/meals/transcribe` (Premium: voz) |
+| Prontidão | `GET me/readiness` (modelo do `backend-ai`, ou a regra simples) |
+| Agenda | `GET/POST trainer/agenda`, `DELETE trainer/agenda/{id}` · `GET me/agenda` |
 | Marketplace | `GET trainers?city=&specialty=` · `GET trainers/{id}` · `GET/POST trainers/{id}/reviews` · `POST trainers/{id}/hire` · `DELETE me/coaching` |
 | Conversas | `GET conversations` · `GET conversations/{id}/messages?after=\|before=` · `POST …/messages` (`text`, `photo`, `file`, `workout`) · `POST …/read` |
 | Pagamentos | `GET me/subscriptions` · `POST me/premium/checkout`, `me/premium/cancel` · `GET me/payments` · `POST me/payments/{id}/refund-request` |
-| PT | `GET trainer/students`, `trainer/students/{id}` (+ `/workouts`, `/progress`, `/weights`, `/meals`, `/plan`) · `PUT trainer/students/{id}/plan` · `POST trainer/students/{id}/end` · `trainer/plans` (CRUD, `from-template/{id}`) · `trainer/packages` (CRUD) · `trainer/verification` (+ `documents/{type}`, `submit`) · `trainer/marketplace` (+ `checkout`, `cancel`) · `trainer/payout-account` (+ `onboarding`) · `GET trainer/earnings?month=` |
+| PT | `GET trainer/students`, `trainer/students/{id}` (+ `/workouts`, `/progress`, `/weights`, `/meals`, `/plan`) · `POST trainer/students/{id}/suggestions/{kind}` (aplicar/ignorar) · `PUT trainer/students/{id}/plan` · `POST trainer/students/{id}/end` · `trainer/plans` (CRUD, `from-template/{id}`) · `trainer/packages` (CRUD) · `trainer/verification` (+ `documents/{type}`, `submit`) · `trainer/marketplace` (+ `checkout`, `cancel`) · `trainer/payout-account` (+ `onboarding`) · `GET trainer/earnings?month=` |
 | Denúncias | `POST reports` |
-| Admin | `GET admin/overview` · `admin/users` (+ `suspend`, `reactivate`) · `admin/payments` (+ `refund-decision`) · `admin/verifications` (+ `decision`), `admin/verification-documents/{id}/status` · `admin/reports` (+ `resolve`) · `admin/exercises` (+ `demo-status`) · `GET admin/audit` |
+| Admin | `GET admin/overview` · `admin/settings` · `admin/users` (+ `totals`, `suspend`, `reactivate`) · `admin/payments` (+ `refund-decision`) · `admin/verifications` (+ `decision`), `admin/verification-documents/{id}/status` · `admin/reports` (+ `resolve`) · `admin/exercises` (+ `demo-status`) · `GET admin/audit` |
 | Stripe | `POST billing/stripe/webhook` (assinado) |
 
 ## Estrutura
@@ -115,6 +126,7 @@ src/main/resources/db/migration/       Flyway: esquema, exercícios e plano A·B
 - **Notificações push** (Expo) para mensagens novas: o chat funciona por *polling* (`?after=`).
 - **Pacotes mensais com renovação automática**: hoje cada pagamento cobre um mês; o passo seguinte é uma
   subscrição Stripe com `application_fee_percent` na conta do PT.
+- **Recuperar a palavra-passe por email** (precisa de um serviço de email).
+- **Videochamadas**: as sessões online marcam-se na agenda e a ligação combina-se no chat.
 - **Armazenamento S3** para ficheiros (a interface `FileStorage` já está pronta) e limites de pedidos partilhados
   (Redis) se houver mais de uma instância.
-- Sugestões de IA e prontidão vêm do `backend-ai`.

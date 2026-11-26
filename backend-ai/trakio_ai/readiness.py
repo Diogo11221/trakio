@@ -62,7 +62,11 @@ def features(req: ReadinessRequest) -> dict[str, float]:
     week = [s for s in past if s.finished_at > now - timedelta(days=7)]
     month = [s for s in past if s.finished_at > now - timedelta(days=28)]
     acute = sum(s.volume_kg for s in week)
-    chronic = sum(s.volume_kg for s in month) / 4
+    # Weekly average over the history there is (1–4 weeks): someone who started 10 days ago
+    # isn't compared against weeks in which they had no account yet.
+    first = month[0].finished_at if month else now
+    weeks = min(4.0, max(1.0, (now - first).total_seconds() / (7 * 86400)))
+    chronic = sum(s.volume_kg for s in month) / weeks
     acwr = acute / chronic if chronic > 0 else (1.0 if acute == 0 else 1.5)
     days_since = (now - past[-1].finished_at).total_seconds() / 86400 if past else 14.0
     felt = [FEELING_SCORE[s.feeling] for s in week if s.feeling]

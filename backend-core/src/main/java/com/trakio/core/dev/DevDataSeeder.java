@@ -51,6 +51,10 @@ import com.trakio.core.agenda.Appointment;
 import com.trakio.core.agenda.AppointmentRepository;
 import com.trakio.core.files.FilePurpose;
 import com.trakio.core.files.FileStorage;
+import com.trakio.core.nutrition.Meal;
+import com.trakio.core.nutrition.MealItem;
+import com.trakio.core.nutrition.MealSlot;
+import com.trakio.core.nutrition.MealSource;
 import com.trakio.core.files.FileType;
 import com.trakio.core.files.StoredFile;
 import com.trakio.core.files.StoredFileRepository;
@@ -101,6 +105,9 @@ class DevDataSeeder implements ApplicationRunner {
     private final PasswordEncoder passwords;
     private final FileStorage storage;
     private final AppointmentRepository appointments;
+    private final com.trakio.core.nutrition.FoodRepository foods;
+    private final com.trakio.core.nutrition.MealRepository mealRepository;
+    private final com.trakio.core.moderation.ReportRepository reports;
     private final Clock clock;
 
     DevDataSeeder(UserRepository users, PreferencesRepository preferences, ClientProfileRepository clients,
@@ -109,7 +116,8 @@ class DevDataSeeder implements ApplicationRunner {
             MessageRepository messages, WorkoutPlanRepository plans, WorkoutSessionRepository sessions,
             WeightEntryRepository weights, ReviewRepository reviews, VerificationRequestRepository verifications,
             StoredFileRepository files, PasswordEncoder passwords, FileStorage storage, AppointmentRepository appointments,
-            Clock clock) {
+            com.trakio.core.nutrition.FoodRepository foods, com.trakio.core.nutrition.MealRepository mealRepository,
+            com.trakio.core.moderation.ReportRepository reports, Clock clock) {
         this.users = users;
         this.preferences = preferences;
         this.clients = clients;
@@ -129,6 +137,9 @@ class DevDataSeeder implements ApplicationRunner {
         this.passwords = passwords;
         this.storage = storage;
         this.appointments = appointments;
+        this.foods = foods;
+        this.mealRepository = mealRepository;
+        this.reports = reports;
         this.clock = clock;
     }
 
@@ -190,6 +201,7 @@ class DevDataSeeder implements ApplicationRunner {
                 "O supino hoje estava leve. Subo o peso na próxima?", "Sim! Sobe 2,5 kg e mantém as 8 repetições."));
         premium(miguel, now);
         history(miguel, template, now, 24, 2.34, null);
+        meals(miguel, now);
         weighIns(miguel, now);
         reviews.save(new Review(rita.getId(), miguel.getId(), 5, "A Rita ajusta o plano todas as semanas. Nunca treinei tão bem.",
                 now.minus(10, ChronoUnit.DAYS)));
@@ -212,6 +224,18 @@ class DevDataSeeder implements ApplicationRunner {
                 List.of("Olá Sofia! Ficamos para as 10h, por videochamada?", "Combinado, às 10h estou online!"));
         User tomas = student("tomas", "Tomás Silva", Sex.MALE, 2000, 180, 74, 78.0, Goal.GAIN, 3, ritaTrain, 2, template, 0, 0, null,
                 List.of());
+        // Back-office examples: a refund request and a suspicious review reported by the PT.
+        payments.findByPayerIdOrderByCreatedAtDesc(sofia.getId(), org.springframework.data.domain.PageRequest.of(0, 1)).getContent()
+                .forEach(p -> p.refundRequested("A sessão das 10:00 não aconteceu, a PT não entrou na videochamada."));
+        User marco = user("marco@trakio.test", Role.CLIENT, hash);
+        ClientProfile marcoProfile = new ClientProfile(marco.getId());
+        marcoProfile.update(new ClientProfileInput("Marco Pinto", null, Sex.MALE, 1992, 176, 80, null, Goal.MAINTAIN,
+                ActivityLevel.LIGHT, 3, Experience.NEW, false));
+        clients.save(marcoProfile);
+        Review fake = reviews.save(new Review(rita.getId(), marco.getId(), 1, "Não percam tempo, é uma fraude.", now));
+        reports.save(new com.trakio.core.moderation.Report(rita.getId(), com.trakio.core.moderation.ReportKind.REVIEW, fake.getId(),
+                rita.getId(), "Esta pessoa nunca foi minha aluna."));
+
         var today = LocalDate.now(clock.withZone(java.time.ZoneId.of("Europe/Lisbon")));
         appointments.save(new Appointment(rita.getId(), sofia.getId(),
                 today.atTime(10, 0).atZone(java.time.ZoneId.of("Europe/Lisbon")).toInstant(), 45, "Sessão online", "", true));
@@ -352,6 +376,18 @@ class DevDataSeeder implements ApplicationRunner {
             sessions.save(new WorkoutSession(client.getId(), "demo-" + i, plan.getId(), day.getId(), day.getLabel(), day.getFocus(),
                     finished.minus(55, ChronoUnit.MINUTES), finished, i % 4 == 0 ? Feeling.HARD : Feeling.GOOD, done, finished));
         }
+    }
+
+    /** Breakfast and lunch already logged today (the Figma "Nutrição" screen). */
+    private void meals(User client, Instant now) {
+        var today = LocalDate.now(clock.withZone(java.time.ZoneId.of("Europe/Lisbon")));
+        var byId = foods.findAllById(List.of("aveia", "iogurte-grego", "banana", "frango", "arroz", "salada", "azeite")).stream()
+                .collect(java.util.stream.Collectors.toMap(f -> f.getId(), f -> f));
+        mealRepository.save(new Meal(client.getId(), today, MealSlot.BREAKFAST, java.time.LocalTime.of(8, 10), MealSource.MANUAL, null,
+                List.of(MealItem.of(byId.get("aveia"), 60), MealItem.of(byId.get("iogurte-grego"), 170), MealItem.of(byId.get("banana"), 120)), now));
+        mealRepository.save(new Meal(client.getId(), today, MealSlot.LUNCH, java.time.LocalTime.of(13, 2), MealSource.AI, null,
+                List.of(MealItem.of(byId.get("frango"), 160), MealItem.of(byId.get("arroz"), 150), MealItem.of(byId.get("salada"), 80),
+                        MealItem.of(byId.get("azeite"), 5)), now));
     }
 
     private void weighIns(User client, Instant now) {

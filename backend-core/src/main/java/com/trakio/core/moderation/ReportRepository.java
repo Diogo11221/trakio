@@ -11,6 +11,8 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
 
     List<Report> findByStatusOrderByCreatedAtAsc(ReportStatus status);
 
+    List<Report> findTop50ByStatusOrderByResolvedAtDesc(ReportStatus status);
+
     long countByStatus(ReportStatus status);
 
     @Query("""
