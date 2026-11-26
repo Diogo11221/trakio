@@ -1,0 +1,19 @@
+trakio:
+  jwt:
+    secret: dGVzdC1vbmx5LWp3dC1rZXktdHJha2lvLWJhY2tlbmQtY29yZS10ZXN0cy0xMjM0NTY=
+  payments:
+    provider: fake
+  storage:
+    local-dir: target/test-uploads
+  rate-limit:
+    auth-per-minute: 100000
+    general-per-minute: 100000
+  cors:
+    allowed-origins: http://localhost:5173
+
+logging:
+  level:
+    com.trakio: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.flywaydb: WARN

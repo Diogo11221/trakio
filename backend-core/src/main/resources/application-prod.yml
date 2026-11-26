@@ -1,0 +1,15 @@
+# Production: everything sensitive must come from the environment (no defaults here on purpose).
+spring:
+  datasource:
+    url: ${TRAKIO_DB_URL}
+    username: ${TRAKIO_DB_USER}
+    password: ${TRAKIO_DB_PASSWORD}
+
+server:
+  forward-headers-strategy: ${TRAKIO_FORWARD_HEADERS:native}
+
+trakio:
+  payments:
+    provider: stripe
+  cors:
+    allowed-origins: ${TRAKIO_CORS_ORIGINS}
