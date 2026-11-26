@@ -2,17 +2,27 @@ import { ScrollView, StyleSheet } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
-import { Portrait, type Person } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
-import { students } from '@/features/pt/data';
-import { studentBodies } from '@/features/tools/data';
+import { bodyOf, StudentAvatar } from '@/features/pt/components';
+import type { Student } from '@/features/pt/data';
+import { useTrainer } from '@/features/pt/store';
+import type { BodyData } from '@/features/tools/data';
 import { colors, durations, fonts, pagePadding } from '@/theme/tokens';
 
+export type MeasuredStudent = Student & { body: BodyData };
+
 /** Students the PT has measurements for — the calculators start from their data. */
-export const measuredStudents = students.filter((s) => studentBodies[s.id] !== undefined);
+export function useMeasuredStudents(): MeasuredStudent[] {
+  const { students } = useTrainer();
+  return students.flatMap((s) => {
+    const body = bodyOf(s);
+    return body ? [{ ...s, body }] : [];
+  });
+}
 
 /** Horizontal row of student chips ("Para quem?") at the top of the PT tools. */
-export function StudentPicker({ value, onChange }: { value: Person; onChange: (student: Person) => void }) {
+export function StudentPicker({ value, onChange }: { value: string; onChange: (student: string) => void }) {
+  const measuredStudents = useMeasuredStudents();
   return (
     <ScrollView
       horizontal
@@ -22,13 +32,13 @@ export function StudentPicker({ value, onChange }: { value: Person; onChange: (s
       accessibilityRole="tablist"
     >
       {measuredStudents.map((s) => (
-        <Chip key={s.id} id={s.id} name={s.firstName} selected={s.id === value} onPress={() => onChange(s.id)} />
+        <Chip key={s.id} student={s} selected={s.id === value} onPress={() => onChange(s.id)} />
       ))}
     </ScrollView>
   );
 }
 
-function Chip({ id, name, selected, onPress }: { id: Person; name: string; selected: boolean; onPress: () => void }) {
+function Chip({ student, selected, onPress }: { student: Student; selected: boolean; onPress: () => void }) {
   const style = useAnimatedStyle(() => ({
     borderColor: withTiming(selected ? colors.voltBorder : colors.border, { duration: durations.fast }),
     backgroundColor: interpolateColor(withTiming(selected ? 1 : 0, { duration: durations.fast }), [0, 1], [colors.surface, colors.surfaceRaised]),
@@ -36,8 +46,8 @@ function Chip({ id, name, selected, onPress }: { id: Person; name: string; selec
   return (
     <PressableScale onPress={onPress} haptic="tick" pressedScale={0.95} accessibilityRole="tab" accessibilityState={{ selected }}>
       <Animated.View style={[styles.chip, style]}>
-        <Portrait person={id} size={26} />
-        <AppText style={[styles.name, selected && styles.nameSelected]}>{name}</AppText>
+        <StudentAvatar student={student} size={26} />
+        <AppText style={[styles.name, selected && styles.nameSelected]}>{student.firstName}</AppText>
       </Animated.View>
     </PressableScale>
   );

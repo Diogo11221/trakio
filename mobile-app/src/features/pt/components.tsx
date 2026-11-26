@@ -8,6 +8,9 @@ import { Card } from '@/components/Surface';
 import { haptics } from '@/lib/haptics';
 import { easeOut } from '@/theme/motion';
 import { colors, fonts } from '@/theme/tokens';
+import { Avatar } from '@/components/Avatar';
+import type { Person } from '@/components/Portrait';
+import { studentBodies, type BodyData } from '@/features/tools/data';
 
 export type Stat = { value: string; label: string; dot?: boolean; extra?: ReactNode };
 
@@ -97,3 +100,19 @@ const styles = StyleSheet.create({
   tagNew: { backgroundColor: colors.volt },
   tagText: { fontFamily: fonts.uiMedium, fontSize: 10 },
 });
+
+/** Student photo: Figma portrait for demo students, their own photo (or the camera circle) for real accounts. */
+export function StudentAvatar({
+  student,
+  size,
+}: {
+  student: { name: string; person?: Person; photoUri?: string | null };
+  size: number;
+}) {
+  return <Avatar photoUri={student.photoUri ?? null} demoPerson={student.person} size={size} name={student.name} />;
+}
+
+/** Calculator inputs for a student: their own measurements (real accounts) or the demo ones. */
+export function bodyOf(student: { person?: Person; body?: BodyData }): BodyData | undefined {
+  return student.body ?? (student.person ? studentBodies[student.person] : undefined);
+}

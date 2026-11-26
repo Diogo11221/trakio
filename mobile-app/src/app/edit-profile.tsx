@@ -48,7 +48,7 @@ function ClientEdit() {
 
   return (
     <ToolScreen title="Editar perfil" description="O plano, as calorias e as calculadoras usam estes dados.">
-      <NameStep name={draft.name} photoUri={draft.photoUri} onChange={patch} hint="É assim que o teu PT te vê." />
+      <NameStep name={draft.name} photoUri={draft.photoUri} demoPerson={draft.photoUri ? undefined : draft.demoPerson} onChange={patch} hint="É assim que o teu PT te vê." />
       <View style={styles.section}>
         <SectionLabel>Sobre ti</SectionLabel>
         <BodyStep value={draft} onChange={patch} />
@@ -93,7 +93,7 @@ function TrainerEdit() {
 
   return (
     <ToolScreen title="Editar perfil" description="É o que os alunos veem no marketplace.">
-      <NameStep name={draft.name} photoUri={draft.photoUri} onChange={patch} hint="Uma foto de cara aumenta os pedidos de alunos." />
+      <NameStep name={draft.name} photoUri={draft.photoUri} demoPerson={draft.photoUri ? undefined : draft.demoPerson} onChange={patch} hint="Uma foto de cara aumenta os pedidos de alunos." />
       <View style={styles.section}>
         <SectionLabel>Onde dás aulas</SectionLabel>
         <PlaceStep value={draft} onChange={patch} />

@@ -5,13 +5,12 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { Card, CardRow } from '@/components/Surface';
 import { AccountSheet } from '@/features/pt/AccountSheet';
-import { SectionHeader, StatStrip } from '@/features/pt/components';
-import { agenda, months, students } from '@/features/pt/data';
+import { SectionHeader, StatStrip, StudentAvatar } from '@/features/pt/components';
+import { agenda, months } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
 import { formatToday, greeting } from '@/lib/format';
 import { refreshMockData } from '@/lib/refresh';
@@ -22,7 +21,7 @@ import { colors, fonts } from '@/theme/tokens';
 export default function TrainerHome() {
   const now = new Date();
   const profile = useTrainerProfile();
-  const { aiDecisions } = useTrainer();
+  const { aiDecisions, students, hiredThisMonth } = useTrainer();
   const [accountOpen, setAccountOpen] = useState(false);
   // Once the trainer acts on an AI suggestion, the student leaves this list.
   const attention = students.filter((s) => s.tag === 'attention' && !aiDecisions[s.id]);
@@ -49,7 +48,7 @@ export default function TrainerHome() {
             stats={[
               { value: String(students.length), label: 'alunos ativos' },
               { value: String(attention.length), label: 'com alertas', dot: attention.length > 0 },
-              { value: `${months[0].received}€`, label: 'este mês' },
+              { value: `${months[0].received + hiredThisMonth}€`, label: 'este mês' },
             ]}
           />
         </Reveal>
@@ -80,7 +79,7 @@ export default function TrainerHome() {
                   accessibilityLabel={`${student.name}: ${student.alert}`}
                 >
                   <CardRow last={i === attention.length - 1} style={styles.row}>
-                    <Portrait person={student.id} size={40} />
+                    <StudentAvatar student={student} size={40} />
                     <View style={styles.flex}>
                       <AppText style={styles.name}>{student.name}</AppText>
                       <AppText variant="caption" tone="muted" numberOfLines={1}>

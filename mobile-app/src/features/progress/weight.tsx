@@ -5,7 +5,7 @@ import { useAuth } from '@/state/auth';
 
 export type WeightEntry = { at: number; kg: number };
 
-function parseWeights(raw: unknown): WeightEntry[] | null {
+export function parseWeights(raw: unknown): WeightEntry[] | null {
   return isArrayOf<WeightEntry>(raw, (e) => isRecord(e) && typeof e.at === 'number' && typeof e.kg === 'number') ? raw : null;
 }
 

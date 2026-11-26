@@ -5,7 +5,6 @@ import Animated from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { lastMessagePreview } from '@/features/pt/data';
@@ -13,6 +12,7 @@ import { useTrainer } from '@/features/pt/store';
 import { refreshMockData } from '@/lib/refresh';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts } from '@/theme/tokens';
+import { StudentAvatar } from '@/features/pt/components';
 
 /** PT · Mensagens. */
 export default function Messages() {
@@ -52,7 +52,7 @@ export default function Messages() {
                 accessibilityLabel={`${conversation.name}${unread ? `, ${conversation.unread} por ler` : ''}`}
               >
                 <View style={styles.row}>
-                  <Portrait person={conversation.id} size={48} />
+                  <StudentAvatar student={conversation} size={48} />
                   <View style={styles.flex}>
                     <View style={styles.line}>
                       <AppText style={[styles.name, unread && styles.nameUnread]}>{conversation.name}</AppText>
