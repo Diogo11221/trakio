@@ -1,3 +1,6 @@
 docs/*
 CLAUDE.md
 .DS_Store
+
+# Local secrets
+.env
