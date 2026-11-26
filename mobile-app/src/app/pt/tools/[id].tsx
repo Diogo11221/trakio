@@ -6,13 +6,11 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
-import type { Person } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { SectionLabel } from '@/components/Surface';
-import { students } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
-import { clientBody, isToolId, studentBodies, toolInfo } from '@/features/tools/data';
-import { measuredStudents, StudentPicker } from '@/features/tools/StudentPicker';
+import { clientBody, isToolId, toolInfo } from '@/features/tools/data';
+import { StudentPicker, useMeasuredStudents } from '@/features/tools/StudentPicker';
 import { ToolScreen } from '@/features/tools/ToolScreen';
 import { ToolView } from '@/features/tools/views';
 import { formatTimeOfDay } from '@/lib/format';
@@ -22,16 +20,18 @@ import { colors, fonts } from '@/theme/tokens';
 /** PT · uma calculadora, com os dados do aluno escolhido e envio pelo chat. */
 export default function TrainerTool() {
   const params = useLocalSearchParams<{ id: string; student?: string }>();
+  const measuredStudents = useMeasuredStudents();
   const initial = measuredStudents.find((s) => s.id === params.student)?.id ?? measuredStudents[0]?.id ?? 'miguel';
-  const [student, setStudent] = useState<Person>(initial);
+  const [student, setStudent] = useState<string>(initial);
+  const selected = measuredStudents.find((s) => s.id === student);
   const [sentFor, setSentFor] = useState<string | null>(null);
   const { conversations } = useTrainer();
 
   if (!isToolId(params.id)) return <Redirect href="/pt/tools" />;
   const tool = params.id;
-  const firstName = students.find((s) => s.id === student)?.firstName ?? 'aluno';
+  const firstName = selected?.firstName ?? 'aluno';
   // "Enviar ao Miguel" / "Enviar à Ana".
-  const toName = `${studentBodies[student]?.sex === 'female' ? 'à' : 'ao'} ${firstName}`;
+  const toName = `${selected?.body.sex === 'female' ? 'à' : 'ao'} ${firstName}`;
   const hasChat = conversations.some((c) => c.id === student);
 
   return (
@@ -55,7 +55,7 @@ export default function TrainerTool() {
       <View key={student} style={styles.body}>
         <ToolView
           tool={tool}
-          initial={studentBodies[student] ?? clientBody}
+          initial={selected?.body ?? clientBody}
           footer={(summary) =>
             hasChat ? (
               <SendFooter
@@ -82,7 +82,7 @@ function SendFooter({
   onSent,
 }: {
   summary: string;
-  student: Person;
+  student: string;
   toName: string;
   sent: boolean;
   onSent: () => void;

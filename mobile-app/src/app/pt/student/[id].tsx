@@ -9,16 +9,14 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { MuscleMap } from '@/components/MuscleMap';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { IconButton } from '@/components/Surface';
-import { SectionHeader, StatStrip } from '@/features/pt/components';
-import { students } from '@/features/pt/data';
+import { bodyOf, SectionHeader, StatStrip, StudentAvatar } from '@/features/pt/components';
+import { endCoaching } from '@/features/pt/localStudents';
 import { useTrainer } from '@/features/pt/store';
 import { ToolGrid } from '@/features/tools/components';
-import { studentBodies } from '@/features/tools/data';
 import { haptics } from '@/lib/haptics';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
@@ -27,13 +25,13 @@ import { colors, fonts, pagePadding } from '@/theme/tokens';
 export default function StudentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const student = students.find((s) => s.id === id) ?? students[0];
-  const { aiDecisions, decideAi } = useTrainer();
+  const { aiDecisions, decideAi, students, refresh } = useTrainer();
+  const student = students.find((s) => s.id === id) ?? students[0]!;
   const decision = aiDecisions[student.id];
   const [moreOpen, setMoreOpen] = useState(false);
 
   const stats = student.stats;
-  const body = studentBodies[student.id];
+  const body = bodyOf(student);
   const openTools = () => router.push({ pathname: '/pt/tools', params: { student: student.id } });
   const openChat = () => router.push({ pathname: '/pt/chat/[id]', params: { id: student.id } });
   const openPlan = () =>
@@ -51,7 +49,7 @@ export default function StudentDetail() {
         </View>
 
         <Reveal index={0} style={styles.header}>
-          <Portrait person={student.id} size={60} />
+          <StudentAvatar student={student} size={60} />
           <View style={styles.flex}>
             <AppText style={styles.name}>{student.name}</AppText>
             <AppText variant="small" tone="muted">
@@ -193,9 +191,12 @@ export default function StudentDetail() {
                   {
                     text: 'Terminar',
                     style: 'destructive',
-                    onPress: () => {
+                    onPress: async () => {
                       setMoreOpen(false);
                       haptics.warning();
+                      // Real (test) accounts are unlinked from this PT; demo students just leave the screen.
+                      if (student.accountId) await endCoaching(student.accountId);
+                      refresh();
                       router.back();
                     },
                   },

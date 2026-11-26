@@ -4,13 +4,12 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { Card, CardRow } from '@/components/Surface';
-import { SectionHeader } from '@/features/pt/components';
-import { months, payments, PLATFORM_FEE, students } from '@/features/pt/data';
+import { SectionHeader, StudentAvatar } from '@/features/pt/components';
+import { months, PLATFORM_FEE } from '@/features/pt/data';
 import { ActivateMarketplaceSheet, CancelMarketplaceSheet } from '@/features/pt/MarketplaceSheets';
 import { useTrainer } from '@/features/pt/store';
 import { haptics } from '@/lib/haptics';
@@ -22,7 +21,7 @@ const money = (value: number) => `${euros.format(value)} €`;
 
 /** PT · Ganhos (+ Subscrição · ativar / cancelar). */
 export default function Earnings() {
-  const { marketplaceActive, setMarketplaceActive } = useTrainer();
+  const { marketplaceActive, setMarketplaceActive, students, payments, hiredThisMonth } = useTrainer();
   const [monthId, setMonthId] = useState(months[0].id);
   const [sheet, setSheet] = useState<'month' | 'activate' | 'cancel' | null>(null);
   const month = months.find((m) => m.id === monthId) ?? months[0];
@@ -43,7 +42,7 @@ export default function Earnings() {
             <AppText variant="small" tone="muted">
               Recebido este mês
             </AppText>
-            <CountUp key={month.id} value={month.received} />
+            <CountUp key={month.id} value={month.received + (month.id === months[0].id ? hiredThisMonth : 0)} />
             <View style={styles.changeRow}>
               <View style={[styles.change, month.change < 0 && styles.changeDown]}>
                 <AppText style={[styles.changeText, month.change < 0 && { color: colors.text }]}>
@@ -82,7 +81,7 @@ export default function Earnings() {
           <Card>
             {payments.map((p, i) => (
               <CardRow key={p.id} last={i === payments.length - 1} style={styles.payment}>
-                <Portrait person={p.student} size={36} />
+                <StudentAvatar student={{ name: p.name, person: p.person, photoUri: p.photoUri }} size={36} />
                 <View style={styles.flex}>
                   <AppText style={styles.rowTitle}>{p.name}</AppText>
                   <AppText variant="caption" tone="muted">

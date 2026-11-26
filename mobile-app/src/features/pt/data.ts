@@ -5,7 +5,14 @@ import type { Person } from '@/components/Portrait';
 export type StudentTag = 'attention' | 'new' | null;
 
 export type Student = {
-  id: Person;
+  /** Demo students use their portrait id; accounts made on this phone use "client:<accountId>". */
+  id: string;
+  /** Portrait from the Figma contact sheets (demo students). */
+  person?: Person;
+  /** Photo picked by a real (test) account. */
+  photoUri?: string | null;
+  /** Set for students who signed up on this phone and hired this PT. */
+  accountId?: string;
   name: string;
   firstName: string;
   goal: string;
@@ -23,7 +30,7 @@ export type Student = {
   volumeNote?: string;
 };
 
-export const students: Student[] = [
+const demoStudents: (Omit<Student, 'id' | 'person'> & { id: Person })[] = [
   {
     id: 'miguel',
     name: 'Miguel Costa',
@@ -134,6 +141,8 @@ export const students: Student[] = [
   },
 ];
 
+export const students: Student[] = demoStudents.map((s) => ({ ...s, person: s.id }));
+
 export const agenda = [
   { id: 'a1', time: '10:00', title: 'Sessão online · Sofia Lopes', detail: 'Videochamada · 45 min', live: true, student: 'sofia' as Person },
   { id: 'a2', time: '18:30', title: 'Avaliação inicial · Tomás Silva', detail: 'Ginásio de Alvalade', live: false, student: 'tomas' as Person },
@@ -221,14 +230,16 @@ export const exerciseLibrary = [
   'Afundos',
 ];
 
-export type Payment = { id: string; student: Person; name: string; pack: string; amount: number };
+export type Payment = { id: string; student: string; person?: Person; photoUri?: string | null; name: string; pack: string; amount: number };
 
-export const payments: Payment[] = [
+const demoPayments: (Omit<Payment, 'student' | 'person'> & { student: Person })[] = [
   { id: 'p1', student: 'miguel', name: 'Miguel Costa', pack: 'Treino + Nutrição', amount: 45 },
   { id: 'p2', student: 'carla', name: 'Carla Sousa', pack: 'Só treino', amount: 35 },
   { id: 'p3', student: 'sofia', name: 'Sofia Lopes', pack: 'Sessão online', amount: 20 },
   { id: 'p4', student: 'pedro', name: 'Pedro Gomes', pack: 'Treino + Nutrição', amount: 45 },
 ];
+
+export const payments: Payment[] = demoPayments.map((p) => ({ ...p, person: p.student }));
 
 /** Platform fee on student payments (assumed 10 %, as in the Figma admin pages). */
 export const PLATFORM_FEE = 0.1;
@@ -246,7 +257,10 @@ export type ChatMessage =
   | { id: string; from: 'system'; kind: 'workout'; title: string; detail: string; time: string };
 
 export type Conversation = {
-  id: Person;
+  /** Same id as the student (and the chat thread). */
+  id: string;
+  person?: Person;
+  photoUri?: string | null;
   name: string;
   subtitle: string;
   time: string;
@@ -254,7 +268,7 @@ export type Conversation = {
   messages: ChatMessage[];
 };
 
-export const conversations: Conversation[] = [
+const demoConversations: (Omit<Conversation, 'id' | 'person'> & { id: Person })[] = [
   {
     id: 'miguel',
     name: 'Miguel Costa',
@@ -317,6 +331,8 @@ export const conversations: Conversation[] = [
     messages: [{ id: 'p1', from: 'system', kind: 'workout', title: 'Treino C · Pernas concluído', detail: '48 min', time: 'Segunda' }],
   },
 ];
+
+export const conversations: Conversation[] = demoConversations.map((c) => ({ ...c, person: c.id }));
 
 /** What the conversation list shows under the name. */
 export function lastMessagePreview(conversation: Conversation): string {

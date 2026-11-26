@@ -151,6 +151,11 @@ export async function signIn(email: string, password: string): Promise<PublicAcc
   return toPublic(account);
 }
 
+/** Every account on this phone — stands in for the server's user list (PT roster, admin). */
+export async function listAccounts(): Promise<PublicAccount[]> {
+  return (await readAccounts()).map(toPublic);
+}
+
 export async function signOut(): Promise<void> {
   await AsyncStorage.removeItem(SESSION_KEY);
 }

@@ -14,6 +14,7 @@ import { Sheet } from '@/components/Sheet';
 import { Card, IconButton, SectionLabel } from '@/components/Surface';
 import { trainers, type Package, type Trainer } from '@/features/marketplace/data';
 import { haptics } from '@/lib/haptics';
+import { recordPayment } from '@/lib/ledger';
 import { useAuth } from '@/state/auth';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
 
@@ -142,7 +143,18 @@ export default function TrainerProfile() {
                 pack: selected.name,
                 price: selected.price,
                 period: selected.period,
+                since: Date.now(),
               },
+            });
+            await recordPayment({
+              id: `pay-${Date.now()}`,
+              trainer: trainer.id,
+              studentId: account.profile.demoPerson ?? `client:${account.id}`,
+              studentName: account.profile.name,
+              photoUri: account.profile.photoUri,
+              pack: selected.name,
+              amount: selected.price,
+              at: Date.now(),
             });
             router.replace('/chat');
           } else {

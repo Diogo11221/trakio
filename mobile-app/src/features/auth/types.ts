@@ -28,7 +28,16 @@ export type ClientProfile = {
   trainer: TrainerLink | null;
 };
 
-export type TrainerLink = { id: Person; name: string; article: 'a' | 'o'; pack: string; price: number; period: string };
+export type TrainerLink = {
+  id: Person;
+  name: string;
+  article: 'a' | 'o';
+  pack: string;
+  price: number;
+  period: string;
+  /** When the PT was hired (epoch ms). */
+  since?: number;
+};
 
 /** Rita — the PT behind "Com o meu PT" until the marketplace links real accounts. */
 export const demoTrainerLink: TrainerLink = {

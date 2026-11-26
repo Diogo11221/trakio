@@ -10,18 +10,18 @@ import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
 import { OptionCard } from '@/components/OptionCard';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { ReorderableList } from '@/components/ReorderableList';
 import { Reveal } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { IconButton } from '@/components/Surface';
-import { createPlanDays, exerciseLibrary, students, type PlanExercise } from '@/features/pt/data';
+import { createPlanDays, exerciseLibrary, type PlanExercise } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
 import { formatTimeOfDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { easeOut } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
+import { StudentAvatar } from '@/features/pt/components';
 
 function restLabel(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -38,7 +38,7 @@ function repsLabel(e: PlanExercise): string {
 export default function PlanEditor() {
   const { id, student: studentId } = useLocalSearchParams<{ id: string; student?: string }>();
   const insets = useSafeAreaInsets();
-  const { plans, planDays, savePlanDays, sendMessage } = useTrainer();
+  const { plans, planDays, savePlanDays, sendMessage, students } = useTrainer();
   const student = students.find((s) => s.id === studentId);
   const plan = plans.find((p) => p.id === id);
   const storeKey = student ? `student:${student.id}` : (plan?.id ?? id);
@@ -132,7 +132,7 @@ export default function PlanEditor() {
         automaticallyAdjustKeyboardInsets
       >
         <Reveal index={0} style={styles.subject}>
-          {student ? <Portrait person={student.id} size={28} /> : <Icon name="plan" size={20} />}
+          {student ? <StudentAvatar student={student} size={28} /> : <Icon name="plan" size={20} />}
           <AppText variant="small" tone="muted" style={styles.flex} numberOfLines={1}>
             {subject}
           </AppText>

@@ -29,7 +29,7 @@ function isSession(raw: unknown): boolean {
   return isRecord(raw) && typeof raw.id === 'string' && typeof raw.finishedAt === 'number' && Array.isArray(raw.exercises);
 }
 
-function parseSessions(raw: unknown): Session[] | null {
+export function parseSessions(raw: unknown): Session[] | null {
   return isArrayOf<Session>(raw, isSession) ? raw : null;
 }
 
@@ -124,6 +124,31 @@ export function sessionFromWorkout(
     exercises,
   };
 }
+
+const DAY_MS = 24 * 3600 * 1000;
+
+/**
+ * Readiness from training load until the watch data (HealthKit) is wired:
+ * rest days push it up, a hard session yesterday pulls it down.
+ */
+export function readinessFrom(sessions: Session[], now: number): { value: number; note: string } {
+  const last = sessions[0];
+  if (!last) return { value: 85, note: 'Ainda sem treinos · começa com calma' };
+  const daysSince = Math.floor((now - last.finishedAt) / DAY_MS);
+  let value = 80;
+  if (last.feeling === 'max') value -= 16;
+  else if (last.feeling === 'hard') value -= 8;
+  if (daysSince === 0) value -= 12;
+  else if (daysSince === 1) value -= 4;
+  else if (daysSince >= 3) value += 6;
+  const recent = sessions.filter((s) => now - s.finishedAt < 7 * DAY_MS).length;
+  if (recent >= 5) value -= 8;
+  value = Math.max(30, Math.min(98, value));
+  const when = daysSince === 0 ? 'Treinaste hoje' : daysSince === 1 ? 'Último treino ontem' : `Último treino há ${daysSince} dias`;
+  const verdict = value >= 75 ? 'pronto para carga' : value >= 55 ? 'treina sem forçar' : 'dia para descansar';
+  return { value, note: `${when} · ${verdict}` };
+}
+
 
 // ── Demo history ────────────────────────────────────────────────────────────
 

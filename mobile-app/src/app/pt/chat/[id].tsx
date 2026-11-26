@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 
-import { Portrait } from '@/components/Portrait';
 import { ChatView } from '@/features/chat/ChatView';
 import { useTrainer } from '@/features/pt/store';
+import { StudentAvatar } from '@/features/pt/components';
 
 /** PT · Mensagens · conversa (+ anexar). */
 export default function Chat() {
@@ -19,7 +19,7 @@ export default function Chat() {
     <ChatView
       messages={conversation.messages}
       mine="me"
-      avatar={<Portrait person={conversation.id} size={36} />}
+      avatar={<StudentAvatar student={conversation} size={36} />}
       name={conversation.name}
       subtitle={conversation.subtitle}
       onOpenProfile={() => router.push({ pathname: '/pt/student/[id]', params: { id: conversation.id } })}

@@ -16,7 +16,7 @@ import { Reveal, Screen } from '@/components/Screen';
 import { Card } from '@/components/Surface';
 import { goalsFor, mealTotals, useDiary } from '@/features/nutrition/diary';
 import { templateFor } from '@/features/workout/data';
-import { nextPlanId, sameDay, useHistory, type Session } from '@/features/workout/history';
+import { nextPlanId, readinessFrom, sameDay, useHistory } from '@/features/workout/history';
 import { useStartWorkout } from '@/features/workout/useStartWorkout';
 import { dayKey } from '@/lib/persist';
 import { useChat } from '@/state/chat';
@@ -24,30 +24,6 @@ import { formatThousands, formatToday, greeting } from '@/lib/format';
 import { colors, fonts, springs } from '@/theme/tokens';
 import { refreshMockData } from '@/lib/refresh';
 import { firstName, useClientProfile } from '@/state/auth';
-
-const day = 24 * 3600 * 1000;
-
-/**
- * Readiness from training load until the watch data (HealthKit) is wired:
- * rest days push it up, a hard session yesterday pulls it down.
- */
-function readinessFrom(sessions: Session[], now: number): { value: number; note: string } {
-  const last = sessions[0];
-  if (!last) return { value: 85, note: 'Ainda sem treinos · começa com calma' };
-  const daysSince = Math.floor((now - last.finishedAt) / day);
-  let value = 80;
-  if (last.feeling === 'max') value -= 16;
-  else if (last.feeling === 'hard') value -= 8;
-  if (daysSince === 0) value -= 12;
-  else if (daysSince === 1) value -= 4;
-  else if (daysSince >= 3) value += 6;
-  const recent = sessions.filter((s) => now - s.finishedAt < 7 * day).length;
-  if (recent >= 5) value -= 8;
-  value = Math.max(30, Math.min(98, value));
-  const when = daysSince === 0 ? 'Treinaste hoje' : daysSince === 1 ? 'Último treino ontem' : `Último treino há ${daysSince} dias`;
-  const verdict = value >= 75 ? 'pronto para carga' : value >= 55 ? 'treina sem forçar' : 'dia para descansar';
-  return { value, note: `${when} · ${verdict}` };
-}
 
 /** Cliente · Hoje. */
 export default function Today() {

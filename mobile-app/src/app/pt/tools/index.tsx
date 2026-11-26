@@ -2,18 +2,19 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import type { Person } from '@/components/Portrait';
 import { SectionLabel } from '@/components/Surface';
 import { ToolGrid } from '@/features/tools/components';
-import { clientBody, studentBodies } from '@/features/tools/data';
-import { measuredStudents, StudentPicker } from '@/features/tools/StudentPicker';
+import { clientBody } from '@/features/tools/data';
+import { StudentPicker, useMeasuredStudents } from '@/features/tools/StudentPicker';
 import { ToolScreen } from '@/features/tools/ToolScreen';
 
 /** PT · Ferramentas: calculadoras com os dados de um aluno. */
 export default function TrainerTools() {
   const params = useLocalSearchParams<{ student?: string }>();
+  const measuredStudents = useMeasuredStudents();
   const initial = measuredStudents.find((s) => s.id === params.student)?.id ?? measuredStudents[0]?.id ?? 'miguel';
-  const [student, setStudent] = useState<Person>(initial);
+  const [student, setStudent] = useState<string>(initial);
+  const selected = measuredStudents.find((s) => s.id === student);
 
   return (
     <ToolScreen
@@ -27,7 +28,7 @@ export default function TrainerTools() {
       }
     >
       <ToolGrid
-        body={studentBodies[student] ?? clientBody}
+        body={selected?.body ?? clientBody}
         onOpen={(id) => router.push({ pathname: '/pt/tools/[id]', params: { id, student } })}
       />
     </ToolScreen>

@@ -6,12 +6,12 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { AppText } from '@/components/AppText';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { Card } from '@/components/Surface';
-import { AdherenceBar, StudentTagPill } from '@/features/pt/components';
-import { students, type Student } from '@/features/pt/data';
+import { AdherenceBar, StudentAvatar, StudentTagPill } from '@/features/pt/components';
+import type { Student } from '@/features/pt/data';
+import { useTrainer } from '@/features/pt/store';
 import { refreshMockData } from '@/lib/refresh';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts } from '@/theme/tokens';
@@ -27,6 +27,7 @@ const filters: { value: Filter; label: string; match: (s: Student) => boolean }[
 /** PT · Alunos. */
 export default function Students() {
   const params = useLocalSearchParams<{ filter?: Filter }>();
+  const { students, refresh } = useTrainer();
   const [filter, setFilter] = useState<Filter>(params.filter ?? 'all');
   const [query, setQuery] = useState('');
 
@@ -49,7 +50,13 @@ export default function Students() {
     });
 
   return (
-    <Screen gap={16} onRefresh={refreshMockData}>
+    <Screen
+      gap={16}
+      onRefresh={async () => {
+        refresh();
+        await refreshMockData();
+      }}
+    >
       <Reveal index={0} style={styles.header}>
         <AppText variant="title">Alunos</AppText>
         <PressableScale onPress={invite} style={styles.invite} accessibilityRole="button" accessibilityLabel="Convidar aluno">
@@ -98,7 +105,7 @@ export default function Students() {
                 accessibilityLabel={student.name}
               >
                 <View style={[styles.row, i < list.length - 1 && styles.divider]}>
-                  <Portrait person={student.id} size={44} />
+                  <StudentAvatar student={student} size={44} />
                   <View style={styles.flex}>
                     <View style={styles.nameRow}>
                       <AppText style={styles.name}>{student.name}</AppText>
