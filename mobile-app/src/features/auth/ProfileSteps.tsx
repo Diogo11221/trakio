@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Avatar } from '@/components/Avatar';
+import type { Person } from '@/components/Portrait';
 import { Checkbox } from '@/components/Checkbox';
 import { Chip } from '@/components/Chip';
 import { OptionCard } from '@/components/OptionCard';
@@ -66,11 +67,13 @@ export function validPlace(draft: TrainerDraft): boolean {
 export function NameStep({
   name,
   photoUri,
+  demoPerson,
   onChange,
   hint,
 }: {
   name: string;
   photoUri: string | null;
+  demoPerson?: Person;
   onChange: (patch: { name?: string; photoUri?: string | null }) => void;
   hint: string;
 }) {
@@ -98,8 +101,8 @@ export function NameStep({
         accessibilityRole="button"
         accessibilityLabel={photoUri ? 'Mudar foto' : 'Adicionar foto'}
       >
-        <Avatar photoUri={photoUri} size={96} name={name || 'Tu'} />
-        <AppText style={styles.photoText}>{photoUri ? 'Mudar foto' : 'Adicionar foto'}</AppText>
+        <Avatar photoUri={photoUri} demoPerson={demoPerson} size={96} name={name || 'Tu'} />
+        <AppText style={styles.photoText}>{photoUri || demoPerson ? 'Mudar foto' : 'Adicionar foto'}</AppText>
       </PressableScale>
       <TextField
         label="Nome"
