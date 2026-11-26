@@ -103,7 +103,9 @@ class AccessControlTest extends IntegrationTest {
                         Map.entry("goal", "maintain"), Map.entry("activity", "light"), Map.entry("daysPerWeek", 3),
                         Map.entry("experience", "new"), Map.entry("coached", true),
                         Map.entry("trainer", Map.of("id", UUID.randomUUID().toString(), "name", "Rita"))), 200);
-        assertThat(call(get("/api/v1/me"), client, null, 200).get("trainer").isNull()).isTrue();
+        JsonNode me = call(get("/api/v1/me"), client, null, 200);
+        assertThat(me.get("trainer").isNull()).isTrue();
+        assertThat(me.get("profile").get("coached").asBoolean()).isFalse();
     }
 
     @Test

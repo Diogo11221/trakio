@@ -149,11 +149,35 @@ public class BillingService {
         log.info("Subscription active user={} kind={}", userId, kind);
     }
 
+    /** Checkout completed with the payment still pending: remember the subscription, grant nothing yet. */
     @Transactional
-    public void subscriptionChanged(String subscriptionId, SubscriptionStatus status, Instant periodEnd, Boolean cancelAtPeriodEnd) {
-        subscriptions.findByProviderSubscriptionId(subscriptionId).ifPresentOrElse(
-                sub -> sub.changed(status, periodEnd, cancelAtPeriodEnd),
-                () -> log.info("Subscription {} not known yet; will be linked on checkout completion", subscriptionId));
+    public void subscriptionPending(UUID userId, SubscriptionKind kind, String subscriptionId, String customerId) {
+        if (!users.existsById(userId)) {
+            return;
+        }
+        Subscription sub = subscriptions.findByUserIdAndKind(userId, kind).orElseGet(() -> new Subscription(userId, kind));
+        sub.linkPending(subscriptionId, customerId);
+        subscriptions.save(sub);
+    }
+
+    /**
+     * Status from Stripe. Events can arrive before checkout completion, so an unknown subscription is
+     * linked through the metadata we put on it ({@code userId}, {@code kind}) instead of being dropped.
+     */
+    @Transactional
+    public void subscriptionChanged(String subscriptionId, SubscriptionStatus status, Instant periodEnd, Boolean cancelAtPeriodEnd,
+            UUID userId, SubscriptionKind kind) {
+        Subscription sub = subscriptions.findByProviderSubscriptionId(subscriptionId).orElse(null);
+        if (sub == null) {
+            if (userId == null || kind == null || !users.existsById(userId)) {
+                log.warn("Subscription {} has no Trakio metadata; ignoring", subscriptionId);
+                return;
+            }
+            sub = subscriptions.findByUserIdAndKind(userId, kind).orElseGet(() -> new Subscription(userId, kind));
+            sub.linkPending(subscriptionId, null);
+        }
+        sub.changed(status, periodEnd, cancelAtPeriodEnd);
+        subscriptions.save(sub);
     }
 
     @Transactional

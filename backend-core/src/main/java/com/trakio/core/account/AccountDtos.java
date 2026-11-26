@@ -101,7 +101,8 @@ public final class AccountDtos {
             @NotNull ActivityLevel activity,
             @Min(1) @Max(7) int daysPerWeek,
             @NotNull Experience experience,
-            boolean coached) implements ProfileInput {}
+            /** Ignored: having a PT comes from a paid relationship, not from the profile form. */
+            Boolean coached) implements ProfileInput {}
 
     public record TrainerProfileInput(
             @NotBlank @Size(max = 80) String name,

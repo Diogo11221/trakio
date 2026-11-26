@@ -60,8 +60,14 @@ class StripeWebhookHandler {
                 Session s = (Session) object;
                 Map<String, String> meta = s.getMetadata() == null ? Map.of() : s.getMetadata();
                 if ("subscription".equals(s.getMode()) && meta.containsKey("userId") && meta.containsKey("kind")) {
-                    billing.subscriptionStarted(UUID.fromString(meta.get("userId")), SubscriptionKind.valueOf(meta.get("kind")),
-                            s.getSubscription(), s.getCustomer(), null);
+                    UUID userId = UUID.fromString(meta.get("userId"));
+                    SubscriptionKind kind = SubscriptionKind.valueOf(meta.get("kind"));
+                    // Only money that arrived grants access; otherwise wait for invoice/subscription events.
+                    if ("paid".equals(s.getPaymentStatus()) || "no_payment_required".equals(s.getPaymentStatus())) {
+                        billing.subscriptionStarted(userId, kind, s.getSubscription(), s.getCustomer(), null);
+                    } else {
+                        billing.subscriptionPending(userId, kind, s.getSubscription(), s.getCustomer());
+                    }
                 } else if ("payment".equals(s.getMode()) && "paid".equals(s.getPaymentStatus()) && meta.containsKey("paymentId")) {
                     billing.coachingPaid(UUID.fromString(meta.get("paymentId")), s.getPaymentIntent());
                 } else {
@@ -81,7 +87,10 @@ class StripeWebhookHandler {
                 Instant periodEnd = sub.getItems() == null || sub.getItems().getData().isEmpty() ? null
                         : epoch(sub.getItems().getData().getFirst().getCurrentPeriodEnd());
                 SubscriptionStatus status = event.getType().endsWith("deleted") ? SubscriptionStatus.CANCELED : status(sub.getStatus());
-                billing.subscriptionChanged(sub.getId(), status, periodEnd, sub.getCancelAtPeriodEnd());
+                Map<String, String> meta = sub.getMetadata() == null ? Map.of() : sub.getMetadata();
+                UUID userId = meta.containsKey("userId") ? UUID.fromString(meta.get("userId")) : null;
+                SubscriptionKind kind = meta.containsKey("kind") ? SubscriptionKind.valueOf(meta.get("kind")) : null;
+                billing.subscriptionChanged(sub.getId(), status, periodEnd, sub.getCancelAtPeriodEnd(), userId, kind);
             }
             case "invoice.paid" -> {
                 Invoice invoice = (Invoice) object;

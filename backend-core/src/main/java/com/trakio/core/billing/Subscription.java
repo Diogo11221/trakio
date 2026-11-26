@@ -48,7 +48,14 @@ public class Subscription extends BaseEntity {
         return status == SubscriptionStatus.ACTIVE || status == SubscriptionStatus.PAST_DUE;
     }
 
+    /**
+     * Payment confirmed. A cancellation Stripe already sent for this same subscription wins: events
+     * can arrive out of order, and a cancelled subscription must never be switched back on.
+     */
     public void started(String subscriptionId, String customerId, Instant periodEnd) {
+        if (subscriptionId != null && subscriptionId.equals(providerSubscriptionId) && status == SubscriptionStatus.CANCELED) {
+            return;
+        }
         this.providerSubscriptionId = subscriptionId;
         this.providerCustomerId = customerId;
         this.status = SubscriptionStatus.ACTIVE;
@@ -56,6 +63,16 @@ public class Subscription extends BaseEntity {
         if (periodEnd != null) {
             this.currentPeriodEnd = periodEnd;
         }
+    }
+
+    /** Checkout finished but the money isn't confirmed yet (e.g. a bank transfer): linked, no access. */
+    public void linkPending(String subscriptionId, String customerId) {
+        if (subscriptionId != null && subscriptionId.equals(providerSubscriptionId)) {
+            return;
+        }
+        this.providerSubscriptionId = subscriptionId;
+        this.providerCustomerId = customerId;
+        this.status = SubscriptionStatus.INCOMPLETE;
     }
 
     public void changed(SubscriptionStatus status, Instant periodEnd, Boolean cancelAtPeriodEnd) {

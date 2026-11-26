@@ -134,7 +134,9 @@ class StripePaymentGateway implements PaymentGateway {
         return call(() -> {
             String accountId = existingAccountId;
             boolean payouts = false;
-            if (accountId == null) {
+            if (accountId != null) {
+                payouts = Boolean.TRUE.equals(Account.retrieve(accountId, options(null)).getPayoutsEnabled());
+            } else {
                 Account account = Account.create(AccountCreateParams.builder()
                         .setType(AccountCreateParams.Type.EXPRESS)
                         .setCountry("PT")

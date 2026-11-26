@@ -88,6 +88,7 @@ public class AccountService {
                 files.requireOwned(userId, in.photoFileId(), FilePurpose.AVATAR);
                 ClientProfile profile = clients.findByUserId(userId).orElseGet(() -> new ClientProfile(userId));
                 profile.update(in);
+                profile.setCoached(coaching.findActiveForClient(userId).isPresent());
                 clients.save(profile);
             }
             case TrainerProfileInput in -> {

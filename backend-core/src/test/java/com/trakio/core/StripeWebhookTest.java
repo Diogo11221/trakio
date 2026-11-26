@@ -45,6 +45,46 @@ class StripeWebhookTest extends IntegrationTest {
     }
 
     @Test
+    void aCheckoutWithThePaymentStillPendingGrantsNothingUntilStripeConfirms() throws Exception {
+        Session s = client();
+        String completed = event("evt_pending_" + s.id(), "checkout.session.completed", """
+                {"id":"cs_p","object":"checkout.session","mode":"subscription","subscription":"sub_p_%s",
+                 "customer":"cus_1","payment_status":"unpaid","metadata":{"userId":"%s","kind":"PREMIUM"}}
+                """.formatted(s.id(), s.id()));
+        assertThat(send(completed, signature(completed, SECRET))).isEqualTo(200);
+        assertThat(call(get("/api/v1/me"), s, null, 200).get("premium").asBoolean()).isFalse();
+
+        String active = event("evt_active_" + s.id(), "customer.subscription.updated", subscription("sub_p_" + s.id(), "active", s));
+        assertThat(send(active, signature(active, SECRET))).isEqualTo(200);
+        assertThat(call(get("/api/v1/me"), s, null, 200).get("premium").asBoolean()).isTrue();
+    }
+
+    @Test
+    void aCancellationThatArrivesFirstIsNotUndoneByTheCheckoutEvent() throws Exception {
+        Session s = client();
+        String deleted = event("evt_del_" + s.id(), "customer.subscription.deleted", subscription("sub_c_" + s.id(), "canceled", s));
+        assertThat(send(deleted, signature(deleted, SECRET))).isEqualTo(200);
+        String completed = event("evt_done_" + s.id(), "checkout.session.completed", """
+                {"id":"cs_c","object":"checkout.session","mode":"subscription","subscription":"sub_c_%s",
+                 "customer":"cus_1","payment_status":"paid","metadata":{"userId":"%s","kind":"PREMIUM"}}
+                """.formatted(s.id(), s.id()));
+        assertThat(send(completed, signature(completed, SECRET))).isEqualTo(200);
+        assertThat(call(get("/api/v1/me"), s, null, 200).get("premium").asBoolean()).isFalse();
+    }
+
+    private static String event(String id, String type, String object) {
+        return "{\"id\":\"%s\",\"object\":\"event\",\"api_version\":\"2020-08-27\",\"type\":\"%s\",\"data\":{\"object\":%s}}"
+                .formatted(id, type, object.strip());
+    }
+
+    private static String subscription(String id, String status, Session s) {
+        return """
+                {"id":"%s","object":"subscription","status":"%s","cancel_at_period_end":false,
+                 "metadata":{"userId":"%s","kind":"PREMIUM"},"items":{"object":"list","data":[]}}
+                """.formatted(id, status, s.id());
+    }
+
+    @Test
     void oldSignaturesAreRejected() throws Exception {
         String payload = "{\"id\":\"evt_old\",\"object\":\"event\",\"type\":\"ping\",\"data\":{\"object\":{}}}";
         long tenMinutesAgo = System.currentTimeMillis() / 1000 - 600;

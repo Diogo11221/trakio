@@ -76,7 +76,7 @@ public class ClientProfile extends BaseEntity {
         this.activity = in.activity();
         this.daysPerWeek = in.daysPerWeek();
         this.experience = in.experience();
-        this.coached = in.coached();
+        // "coached" is not taken from the request: it follows the paid relationship (CoachingService).
     }
 
     public UUID getUserId() {

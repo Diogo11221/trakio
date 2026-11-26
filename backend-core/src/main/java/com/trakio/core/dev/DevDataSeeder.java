@@ -251,6 +251,7 @@ class DevDataSeeder implements ApplicationRunner {
         CoachingRelationship rel = new CoachingRelationship(client.getId(), pack);
         rel.activate(since);
         coaching.save(rel);
+        clients.findByUserId(client.getId()).ifPresent(c -> c.setCoached(true));
         for (Instant paid = since; paid.isBefore(clock.instant()); paid = paid.plus(30, ChronoUnit.DAYS)) {
             Payment p = new Payment(client.getId(), pack.getTrainerId(), rel.getId(), PaymentKind.COACHING,
                     pack.getName() + " · Rita Santos", pack.getPriceCents(), Math.round(pack.getPriceCents() * 0.1));
