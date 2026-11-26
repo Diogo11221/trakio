@@ -1,4 +1,3 @@
-import type { Person } from '@/components/Portrait';
 import type { ActivityLevel, Goal, Sex } from '@/features/tools/calc';
 
 export type Role = 'client' | 'trainer';
@@ -8,10 +7,8 @@ export type Experience = 'new' | 'some' | 'advanced';
 export type ClientProfile = {
   kind: 'client';
   name: string;
-  /** Local photo picked on this phone; null shows the "add photo" circle. */
+  /** Server photo (absolute URL) or, while editing, a photo just picked on this phone. null = "add photo". */
   photoUri: string | null;
-  /** Demo accounts reuse the portraits from the Figma contact sheets. */
-  demoPerson?: Person;
   sex: Sex;
   birthYear: number;
   heightCm: number;
@@ -22,65 +19,71 @@ export type ClientProfile = {
   activity: ActivityLevel;
   daysPerWeek: number;
   experience: Experience;
-  /** Chosen on Boas-vindas: "Com o meu PT" vs "Sozinho". */
+  /** Has a PT right now (from a paid relationship — set by the server, not by the app). */
   coached: boolean;
-  /** The PT hired in the marketplace (or the demo PT for "Com o meu PT"). */
+  /** The PT this person pays (null when training alone). */
   trainer: TrainerLink | null;
 };
 
-export type TrainerLink = { id: Person; name: string; article: 'a' | 'o'; pack: string; price: number; period: string };
-
-/** Rita — the PT behind "Com o meu PT" until the marketplace links real accounts. */
-export const demoTrainerLink: TrainerLink = {
-  id: 'rita',
-  name: 'Rita Santos',
-  article: 'a',
-  pack: 'Treino + Nutrição',
-  price: 45,
-  period: 'mês',
+export type TrainerLink = {
+  id: string;
+  name: string;
+  article: 'a' | 'o';
+  photoUri: string | null;
+  pack: string;
+  /** Euros. */
+  price: number;
+  period: 'mês' | 'avulso';
+  conversationId: string | null;
 };
 
 export type TrainerProfile = {
   kind: 'trainer';
   name: string;
   photoUri: string | null;
-  demoPerson?: Person;
+  /** "a Rita" / "o Tiago" — chosen by the PT, never guessed from the name. */
+  article: 'a' | 'o';
   city: string;
+  area: string;
   online: boolean;
+  bio: string;
   specialties: string[];
+  /** Set by Trakio after checking the documents. */
+  verified: boolean;
 };
 
 export type Profile = ClientProfile | TrainerProfile;
 
-export type Account = {
+export type Preferences = { vibration: boolean; lockScreenAlert: boolean; restSound: boolean };
+
+/** The signed-in account as the screens see it. */
+export type PublicAccount = {
   id: string;
   email: string;
   role: Role;
   createdAt: string;
   /** null until onboarding is finished. */
   profile: Profile | null;
-  /** Test only: salted SHA-256, kept on this phone. backend-core will own real credentials. */
-  passwordHash: string;
-  salt: string;
+  premium: boolean;
+  preferences: Preferences;
 };
 
-/** What screens get — never the password hash. */
-export type PublicAccount = Omit<Account, 'passwordHash' | 'salt'>;
-
-export type AuthErrorCode = 'invalid-email' | 'weak-password' | 'email-taken' | 'wrong-credentials' | 'not-found';
-
 export class AuthError extends Error {
-  constructor(readonly code: AuthErrorCode) {
-    super(authErrorMessages[code]);
+  constructor(
+    readonly code: string,
+    message?: string,
+  ) {
+    super(message ?? authErrorMessages[code] ?? 'Algo correu mal. Tenta outra vez.');
   }
 }
 
-export const authErrorMessages: Record<AuthErrorCode, string> = {
+export const authErrorMessages: Record<string, string> = {
   'invalid-email': 'Este email não parece estar certo.',
   'weak-password': 'A palavra-passe precisa de pelo menos 8 caracteres.',
   'email-taken': 'Já existe uma conta com este email. Entra em vez de criar outra.',
   'wrong-credentials': 'Email ou palavra-passe errados.',
   'not-found': 'Esta conta já não existe.',
+  'admin-account': 'Esta é uma conta de administração. Usa o backoffice no browser.',
 };
 
 export const experienceLabel: Record<Experience, string> = {

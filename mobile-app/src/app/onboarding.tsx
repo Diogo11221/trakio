@@ -22,7 +22,8 @@ import {
   type ClientDraft,
   type TrainerDraft,
 } from '@/features/auth/ProfileSteps';
-import { demoTrainerLink, experienceLabel } from '@/features/auth/types';
+import { experienceLabel } from '@/features/auth/types';
+import { ApiError } from '@/lib/api';
 import { ToolGrid } from '@/features/tools/components';
 import { ageFrom, bodyFromProfile, goalLabel } from '@/features/tools/data';
 import { NumberFieldAccessory } from '@/features/workout/components/NumberField';
@@ -144,17 +145,17 @@ export default function Onboarding() {
               kind: 'client',
               ...client,
               name: client.name.trim(),
-              coached: mode === 'coached',
-              trainer: mode === 'coached' ? demoTrainerLink : null,
             }
           : { kind: 'trainer', ...trainer, name: trainer.name.trim(), city: trainer.city.trim() },
       );
       if (role === 'trainer') setMode('trainer');
       haptics.success();
       router.replace(homeFor(saved));
-    } catch {
+      // "Com o meu PT": find and hire them in the marketplace (the link exists once paid).
+      if (role === 'client' && mode === 'coached') setTimeout(() => router.push('/trainers'), 400);
+    } catch (e) {
       setSaving(false);
-      Alert.alert('Não foi possível guardar', 'Tenta outra vez.');
+      Alert.alert('Não foi possível guardar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
     }
   };
 

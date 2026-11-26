@@ -9,45 +9,23 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { ProgressRing, useRingSweep } from '@/components/ProgressRing';
 import { Reveal, Screen } from '@/components/Screen';
 import { Card } from '@/components/Surface';
 import { goalsFor, mealTotals, useDiary } from '@/features/nutrition/diary';
-import { templateFor } from '@/features/workout/data';
-import { nextPlanId, sameDay, useHistory, type Session } from '@/features/workout/history';
+import { usePlan } from '@/features/workout/plan';
+import { sameDay, useHistory } from '@/features/workout/history';
+import { useReadiness } from '@/features/progress/readiness';
 import { useStartWorkout } from '@/features/workout/useStartWorkout';
 import { dayKey } from '@/lib/persist';
 import { useChat } from '@/state/chat';
 import { formatThousands, formatToday, greeting } from '@/lib/format';
 import { colors, fonts, springs } from '@/theme/tokens';
-import { refreshMockData } from '@/lib/refresh';
+import { refreshAll } from '@/lib/refresh';
 import { firstName, useClientProfile } from '@/state/auth';
 
-const day = 24 * 3600 * 1000;
-
-/**
- * Readiness from training load until the watch data (HealthKit) is wired:
- * rest days push it up, a hard session yesterday pulls it down.
- */
-function readinessFrom(sessions: Session[], now: number): { value: number; note: string } {
-  const last = sessions[0];
-  if (!last) return { value: 85, note: 'Ainda sem treinos · começa com calma' };
-  const daysSince = Math.floor((now - last.finishedAt) / day);
-  let value = 80;
-  if (last.feeling === 'max') value -= 16;
-  else if (last.feeling === 'hard') value -= 8;
-  if (daysSince === 0) value -= 12;
-  else if (daysSince === 1) value -= 4;
-  else if (daysSince >= 3) value += 6;
-  const recent = sessions.filter((s) => now - s.finishedAt < 7 * day).length;
-  if (recent >= 5) value -= 8;
-  value = Math.max(30, Math.min(98, value));
-  const when = daysSince === 0 ? 'Treinaste hoje' : daysSince === 1 ? 'Último treino ontem' : `Último treino há ${daysSince} dias`;
-  const verdict = value >= 75 ? 'pronto para carga' : value >= 55 ? 'treina sem forçar' : 'dia para descansar';
-  return { value, note: `${when} · ${verdict}` };
-}
+const emptyDay = { id: '', title: 'Treino', focus: '', muscles: [] as string[], estimatedMinutes: 0, exercises: [] as unknown[] };
 
 /** Cliente · Hoje. */
 export default function Today() {
@@ -58,17 +36,18 @@ export default function Today() {
   const { threads, clientThreadId, trainerName } = useChat();
   const { startPlan, resume, inProgress, current } = useStartWorkout();
 
-  const readiness = readinessFrom(sessions, now.getTime());
+  const readiness = useReadiness();
   const doneToday = sessions.find((s) => sameDay(s.finishedAt, now.getTime()));
-  const plan = templateFor(nextPlanId(sessions))!;
+  const { templateFor, nextPlanId } = usePlan();
+  const plan = (nextPlanId ? templateFor(nextPlanId) : undefined) ?? emptyDay;
   const eaten = mealTotals(mealsOn(dayKey(now)));
   const goal = goalsFor(profile);
   const ring = useRingSweep(Math.min(1, eaten.kcal / goal.kcal), 300);
   const thread = clientThreadId ? threads[clientThreadId] : undefined;
-  const lastFromPt = thread ? [...thread.messages].reverse().find((m) => m.from === 'me') : undefined;
+  const lastFromPt = thread?.lastFromTrainer;
 
   return (
-    <Screen gap={18} onRefresh={refreshMockData}>
+    <Screen gap={18} onRefresh={refreshAll}>
       <Reveal index={0} style={styles.header}>
         <View style={styles.headerText}>
           <AppText variant="caption" style={styles.date} tone="muted">
@@ -79,7 +58,7 @@ export default function Today() {
           </AppText>
         </View>
         <PressableScale onPress={() => router.navigate('/profile')} accessibilityLabel="Perfil">
-          <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={42} name={profile.name} />
+          <Avatar photoUri={profile.photoUri} size={42} name={profile.name} />
         </PressableScale>
       </Reveal>
 
@@ -146,6 +125,7 @@ export default function Today() {
             icon="arrowRight"
             height={50}
             style={styles.cta}
+            disabled={!inProgress && !plan.id}
             onPress={() => (inProgress ? resume() : startPlan(plan.id))}
           />
         </Card>
@@ -177,7 +157,7 @@ export default function Today() {
         <Reveal index={4}>
           <PressableScale onPress={() => router.push('/chat')} accessibilityLabel={`Conversa com ${trainerName.name}`}>
             <Card style={styles.message}>
-              <Portrait person={trainerName.id} size={36} />
+              <Avatar photoUri={trainerName.photoUri} size={36} name={trainerName.name} />
               <View style={styles.messageText}>
                 <View style={styles.messageTop}>
                   <AppText style={styles.messageFrom}>{trainerName.name} · PT</AppText>

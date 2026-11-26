@@ -1,8 +1,10 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 
 import { oneRepMax } from '@/features/tools/calc';
-import { planTemplates, rackRound, templateFor, type PlanId, type WorkoutPlan } from '@/features/workout/data';
-import { accountKey, isArrayOf, isRecord, usePersistentState } from '@/lib/persist';
+import type { WorkoutPlan } from '@/features/workout/data';
+import { api } from '@/lib/api';
+import type { Page, SessionDto } from '@/lib/apiTypes';
+import { useRemote } from '@/lib/useRemote';
 import { useAuth } from '@/state/auth';
 
 export type Feeling = 'easy' | 'good' | 'hard' | 'max';
@@ -10,8 +12,9 @@ export type Feeling = 'easy' | 'good' | 'hard' | 'max';
 export type SessionSet = { kg: number; reps: number };
 
 export type Session = {
+  /** Server id (also what a workout card in the chat points to). */
   id: string;
-  /** Template id, or "livre" for a free workout. */
+  /** Plan day id, or "livre" for a free workout. */
   planId: string;
   title: string;
   focus: string;
@@ -24,14 +27,6 @@ export type Session = {
   records: string[];
   exercises: { id: string; name: string; sets: SessionSet[] }[];
 };
-
-function isSession(raw: unknown): boolean {
-  return isRecord(raw) && typeof raw.id === 'string' && typeof raw.finishedAt === 'number' && Array.isArray(raw.exercises);
-}
-
-function parseSessions(raw: unknown): Session[] | null {
-  return isArrayOf<Session>(raw, isSession) ? raw : null;
-}
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -49,14 +44,6 @@ export function lastSets(sessions: Session[], exerciseId: string): SessionSet[] 
     if (exercise && exercise.sets.length > 0) return exercise.sets;
   }
   return null;
-}
-
-/** The plan after the last one done (A → B → C → A). */
-export function nextPlanId(sessions: Session[]): PlanId {
-  const last = sessions.find((s) => templateFor(s.planId));
-  if (!last) return 'treino-a';
-  const index = planTemplates.findIndex((p) => p.id === last.planId);
-  return planTemplates[(index + 1) % planTemplates.length]!.id;
 }
 
 /** Monday 00:00 of the current week. */
@@ -125,80 +112,70 @@ export function sessionFromWorkout(
   };
 }
 
-// ── Demo history ────────────────────────────────────────────────────────────
-
-/** Eight weeks of A/B/C for the demo client, ending two days ago so "Treino A" is next. */
-function demoSessions(): Session[] {
-  const sessions: Session[] = [];
-  const day = 24 * 3600 * 1000;
-  const now = Date.now();
-  const count = 24;
-  for (let i = 0; i < count; i++) {
-    // i = 0 is the most recent (Treino C, two days ago).
-    const template = planTemplates[(2 - (i % 3) + 3) % 3]!;
-    const daysAgo = 2 + Math.round(i * 2.34);
-    const date = new Date(now - daysAgo * day);
-    date.setHours(19, 0, 0, 0);
-    const finishedAt = date.getTime();
-    const progress = 1 - i * 0.006; // ~0,6 % stronger per session
-    const exercises = template.exercises.map((t) => {
-      // Peso morto romeno stalls for the last three weeks (shows "sem evolução").
-      const stalled = t.id === 'peso-morto-romeno' && i < 9;
-      const kg = rackRound(t.kg * (stalled ? 1 - 9 * 0.006 : progress));
-      return {
-        id: t.id,
-        name: t.name,
-        sets: Array.from({ length: t.sets }, (_, s) => ({ kg, reps: Math.max(1, t.reps - (s === t.sets - 1 && i % 2 === 0 ? 1 : 0)) })),
-      };
-    });
-    const volume = exercises.reduce((sum, e) => sum + e.sets.reduce((v, s) => v + s.kg * s.reps, 0), 0);
-    sessions.push({
-      id: `demo-${i}`,
-      planId: template.id,
-      title: template.title,
-      focus: template.focus,
-      startedAt: finishedAt - template.estimatedMinutes * 60000,
-      finishedAt,
-      volume,
-      sets: exercises.reduce((n, e) => n + e.sets.length, 0),
-      feeling: i % 4 === 0 ? 'hard' : 'good',
-      records: i === 0 ? ['Agachamento'] : [],
-      exercises,
-    });
-  }
-  return sessions;
-}
-
 // ── Provider ────────────────────────────────────────────────────────────────
+
+function fromDto(dto: SessionDto): Session {
+  return {
+    id: dto.id,
+    planId: dto.planDayId ?? 'livre',
+    title: dto.title,
+    focus: dto.focus,
+    startedAt: Date.parse(dto.startedAt),
+    finishedAt: Date.parse(dto.finishedAt),
+    volume: dto.volumeKg,
+    sets: dto.sets,
+    feeling: dto.feeling,
+    records: dto.records,
+    exercises: dto.exercises.map((e) => ({ id: e.exercise, name: e.name, sets: e.sets })),
+  };
+}
 
 type HistoryContextValue = {
   sessions: Session[];
-  /** Saves a finished workout and works out which exercises set a record. */
-  addSession: (session: Omit<Session, 'records'>) => Session;
+  loaded: boolean;
+  /**
+   * Saves a finished workout on the server, which works out volume and records. Retrying the
+   * same workout (same start time) never saves it twice.
+   */
+  addSession: (session: Omit<Session, 'records'>, serverPlanId: string | null) => Promise<Session>;
+  reload: () => Promise<void>;
 };
 
 const HistoryContext = createContext<HistoryContextValue | null>(null);
 
 export function HistoryProvider({ children }: { children: ReactNode }) {
   const { account } = useAuth();
-  const demo = account?.id === 'demo-miguel';
-  const [sessions, setSessions] = usePersistentState(
-    accountKey(account?.id, 'history'),
-    () => (demo ? demoSessions() : []),
-    parseSessions,
+  const isClient = account?.role === 'client' && account.profile !== null;
+  const fetcher = useCallback(
+    () => api.get<Page<SessionDto>>('/api/v1/me/workouts?size=100').then((page) => page.content.map(fromDto)),
+    [],
   );
+  const { data, reload, update } = useRemote(isClient ? account.id : null, isClient ? fetcher : null);
 
   const value = useMemo<HistoryContextValue>(
     () => ({
-      sessions,
-      addSession: (draft) => {
-        const records = recordsIn(sessions, draft.exercises).map((r) => r.name);
-        const session: Session = { ...draft, records };
-        setSessions((list) => [session, ...list]);
+      sessions: data ?? [],
+      loaded: data !== null,
+      reload,
+      addSession: async (draft, serverPlanId) => {
+        const fromPlan = draft.planId !== 'livre';
+        const saved = await api.post<SessionDto>('/api/v1/me/workouts', {
+          clientRef: `w-${draft.startedAt}`,
+          planId: fromPlan ? serverPlanId : null,
+          planDayId: fromPlan ? draft.planId : null,
+          title: draft.title,
+          focus: draft.focus,
+          startedAt: new Date(draft.startedAt).toISOString(),
+          finishedAt: new Date(draft.finishedAt).toISOString(),
+          feeling: draft.feeling,
+          exercises: draft.exercises.map((e) => ({ exercise: e.id, sets: e.sets })),
+        });
+        const session = fromDto(saved);
+        update((sessions) => [session, ...sessions.filter((x) => x.id !== session.id)]);
         return session;
       },
     }),
-    [sessions, setSessions],
+    [data, reload, update],
   );
 
   return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
@@ -11,7 +11,6 @@ import { slotForHour, slots, useDiary, type MealSlot } from '@/features/nutritio
 import { parseMeal, totals } from '@/features/nutrition/foods';
 import { formatTimeOfDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { newId } from '@/lib/persist';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, radii } from '@/theme/tokens';
 
@@ -47,18 +46,20 @@ export function AddMealSheet({
     onClose();
   };
 
-  const save = () => {
-    if (items.length === 0) return;
-    addMeal(day, {
-      id: newId('meal'),
-      slot: chosen,
-      time: formatTimeOfDay(new Date()),
-      items,
-      source: 'manual',
-      photoUri: null,
-    });
-    haptics.success();
-    close();
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (items.length === 0 || saving) return;
+    setSaving(true);
+    try {
+      await addMeal(day, { slot: chosen, time: formatTimeOfDay(new Date()), items, source: 'manual', photoUri: null });
+      haptics.success();
+      close();
+    } catch {
+      Alert.alert('Não foi possível guardar', 'Verifica a ligação e tenta outra vez.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

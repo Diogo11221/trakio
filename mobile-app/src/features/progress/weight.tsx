@@ -1,57 +1,50 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 
-import { accountKey, isArrayOf, isRecord, usePersistentState } from '@/lib/persist';
+import { api } from '@/lib/api';
+import type { WeightDto } from '@/lib/apiTypes';
+import { dayKey } from '@/lib/persist';
+import { useRemote } from '@/lib/useRemote';
 import { useAuth } from '@/state/auth';
 
 export type WeightEntry = { at: number; kg: number };
 
-function parseWeights(raw: unknown): WeightEntry[] | null {
-  return isArrayOf<WeightEntry>(raw, (e) => isRecord(e) && typeof e.at === 'number' && typeof e.kg === 'number') ? raw : null;
-}
-
-/** Weekly weigh-ins for the demo client: 76,0 → 78,4 kg over two months. */
-function demoWeights(): WeightEntry[] {
-  const week = 7 * 24 * 3600 * 1000;
-  const now = Date.now();
-  const values = [76.0, 76.3, 76.4, 76.9, 77.1, 77.0, 77.6, 77.9, 78.4];
-  return values.map((kg, i) => ({ at: now - (values.length - 1 - i) * week - 3600 * 1000, kg }));
-}
-
 type WeightContextValue = {
   /** Oldest first. */
   entries: WeightEntry[];
-  /** Logs today's weight (replaces an entry from earlier today) and updates the profile. */
+  /** Logs today's weight (replaces one from earlier today); the server also updates the profile. */
   logWeight: (kg: number) => Promise<void>;
 };
 
 const WeightContext = createContext<WeightContextValue | null>(null);
 
+/** "2026-11-25" → noon that day, local time. */
+function at(day: string): number {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1, 12).getTime();
+}
+
 export function WeightProvider({ children }: { children: ReactNode }) {
-  const { account, saveProfile } = useAuth();
-  const demo = account?.id === 'demo-miguel';
+  const { account, refresh } = useAuth();
   const profile = account?.profile?.kind === 'client' ? account.profile : null;
-  const [stored, setEntries] = usePersistentState(
-    accountKey(account?.id, 'weight'),
-    () => (demo ? demoWeights() : []),
-    parseWeights,
+  const fetcher = useCallback(
+    () => api.get<WeightDto[]>('/api/v1/me/weights').then((list) => list.map((w) => ({ at: at(w.day), kg: w.kg }))),
+    [],
   );
+  const owner = profile && account ? account.id : null;
+  const { data, reload } = useRemote(owner, owner ? fetcher : null);
+  const stored = useMemo(() => data ?? [], [data]);
 
   const value = useMemo<WeightContextValue>(() => {
-    // New accounts start from the weight given in onboarding.
+    // Before any weigh-in, the weight from onboarding is the starting point.
     const entries = stored.length === 0 && profile && account ? [{ at: Date.parse(account.createdAt), kg: profile.weightKg }] : stored;
     return {
       entries,
       logWeight: async (kg) => {
-        const now = new Date();
-        const startOfDay = new Date(now).setHours(0, 0, 0, 0);
-        setEntries((list) => {
-          const base = list.length === 0 ? entries : list;
-          return [...base.filter((e) => e.at < startOfDay), { at: now.getTime(), kg }];
-        });
-        if (profile) await saveProfile({ ...profile, weightKg: kg });
+        await api.post('/api/v1/me/weights', { kg, day: dayKey(new Date()) });
+        await Promise.all([reload(), refresh()]);
       },
     };
-  }, [account, profile, saveProfile, setEntries, stored]);
+  }, [account, profile, refresh, reload, stored]);
 
   return <WeightContext.Provider value={value}>{children}</WeightContext.Provider>;
 }

@@ -2,8 +2,9 @@ import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
 import type { Experience } from '@/features/auth/types';
-import { buildWorkout, exerciseLibrary, templateFor, type PlanId, type WorkoutPlan } from '@/features/workout/data';
+import { buildWorkout, type PlanId, type WorkoutPlan } from '@/features/workout/data';
 import { lastSets, useHistory } from '@/features/workout/history';
+import { usePlan } from '@/features/workout/plan';
 import { useWorkout } from '@/features/workout/store';
 import { useClientProfile } from '@/state/auth';
 
@@ -15,6 +16,7 @@ export function useStartWorkout() {
   const { load, inProgress, state } = useWorkout();
   const { sessions } = useHistory();
   const profile = useClientProfile();
+  const { templateFor, exerciseLibrary } = usePlan();
   const scale = experienceScale[profile.experience];
   const last = (exerciseId: string) => lastSets(sessions, exerciseId);
 

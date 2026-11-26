@@ -2,35 +2,24 @@ import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/Icon';
-import { Portrait, type Person } from '@/components/Portrait';
+import { protectedImage } from '@/lib/api';
 import { colors } from '@/theme/tokens';
 
 /**
- * The signed-in person's photo: their own picture, the Figma portrait for demo
- * accounts, or an empty circle with a camera until they add one (no initials).
+ * Someone's photo — from the server (sent with the session token) or just picked on this phone —
+ * or an empty circle with a camera until they add one (no initials).
  */
-export function Avatar({
-  photoUri,
-  demoPerson,
-  size,
-  name,
-}: {
-  photoUri: string | null;
-  demoPerson?: Person;
-  size: number;
-  name: string;
-}) {
+export function Avatar({ photoUri, size, name }: { photoUri: string | null; size: number; name: string }) {
   if (photoUri) {
     return (
       <Image
-        source={{ uri: photoUri }}
+        source={protectedImage(photoUri)}
         style={{ width: size, height: size, borderRadius: size / 2 }}
         contentFit="cover"
         accessibilityLabel={name}
       />
     );
   }
-  if (demoPerson) return <Portrait person={demoPerson} size={size} />;
   return (
     <View
       style={[styles.empty, { width: size, height: size, borderRadius: size / 2 }]}

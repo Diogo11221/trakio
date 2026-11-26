@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
@@ -9,10 +9,11 @@ import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { Card } from '@/components/Surface';
-import { trakioTemplates, type PlanSummary } from '@/features/pt/data';
+import type { PlanSummary } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
 import { haptics } from '@/lib/haptics';
-import { refreshMockData } from '@/lib/refresh';
+import { refreshAll } from '@/lib/refresh';
+import { ApiError } from '@/lib/api';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -23,23 +24,35 @@ const tabs = [
 
 /** PT · Planos. */
 export default function Plans() {
-  const { plans, addPlan } = useTrainer();
+  const { plans, templates, addPlan } = useTrainer();
   const [tab, setTab] = useState<(typeof tabs)[number]['value']>('mine');
-  const list: PlanSummary[] = tab === 'mine' ? plans : trakioTemplates;
+  const list: PlanSummary[] = tab === 'mine' ? plans : templates;
 
-  const open = (plan: PlanSummary) => router.push({ pathname: '/pt/plan/[id]', params: { id: plan.id } });
+  const openId = (id: string) => router.push({ pathname: '/pt/plan/[id]', params: { id } });
+
+  /** A Trakio template becomes the PT's own plan, then opens in the editor. */
+  const fromTemplate = async (templateId: string) => {
+    try {
+      const id = await addPlan(templateId);
+      haptics.success();
+      setTab('mine');
+      setTimeout(() => openId(id), 260);
+    } catch (e) {
+      Alert.alert('Não foi possível criar o plano', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+    }
+  };
+
+  const open = (plan: PlanSummary) => (tab === 'templates' ? fromTemplate(plan.id) : openId(plan.id));
 
   return (
-    <Screen gap={16} onRefresh={refreshMockData}>
+    <Screen gap={16} onRefresh={refreshAll}>
       <Reveal index={0} style={styles.header}>
         <AppText variant="title">Planos</AppText>
         <PressableScale
           haptic="press"
           onPress={() => {
-            const plan = addPlan();
-            haptics.success();
-            setTab('mine');
-            setTimeout(() => open(plan), 260);
+            const first = templates[0];
+            if (first) fromTemplate(first.id);
           }}
           style={styles.new}
           accessibilityRole="button"
@@ -56,6 +69,13 @@ export default function Plans() {
       <Reveal index={2}>
         <Animated.View key={tab} entering={FadeIn.duration(220)}>
           <Card>
+            {list.length === 0 ? (
+              <View style={styles.row}>
+                <AppText variant="small" tone="muted">
+                  {tab === 'mine' ? 'Ainda não tens planos. Começa por um modelo Trakio.' : 'Sem modelos.'}
+                </AppText>
+              </View>
+            ) : null}
             {list.map((plan, i) => (
               <Animated.View key={plan.id} layout={layoutGlide} entering={FadeIn.duration(240)}>
                 <PressableScale onPress={() => open(plan)} pressedScale={0.99} accessibilityLabel={plan.name}>
@@ -82,7 +102,7 @@ export default function Plans() {
 
       <Reveal index={3} style={styles.tip}>
         <AppText variant="caption" tone="muted" style={styles.tipText}>
-          Ao alterar um plano, escolhes se a mudança vale para todos os alunos ou só para um.
+          Ao alterar um plano, a mudança vale para todos os alunos que o seguem. Para mudar só o plano de um aluno, abre-o a partir do perfil dele.
         </AppText>
       </Reveal>
     </Screen>

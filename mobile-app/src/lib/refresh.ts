@@ -1,8 +1,15 @@
 /**
- * Pull-to-refresh handler for the tabs. Data is still mocked, so this only
- * waits long enough for the ring to read as "loading"; swap for real fetches
- * once backend-core exposes the endpoints.
+ * Pull-to-refresh for the tabs: every data provider registers how to reload itself, and
+ * pulling down reloads them all.
  */
-export function refreshMockData(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 1100));
+type Refresher = () => Promise<unknown>;
+const refreshers = new Set<Refresher>();
+
+export function registerRefresher(refresher: Refresher): () => void {
+  refreshers.add(refresher);
+  return () => refreshers.delete(refresher);
+}
+
+export async function refreshAll(): Promise<void> {
+  await Promise.allSettled([...refreshers].map((r) => r()));
 }

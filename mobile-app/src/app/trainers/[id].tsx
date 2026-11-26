@@ -1,18 +1,21 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { OptionCard } from '@/components/OptionCard';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { Reveal } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { Card, IconButton, SectionLabel } from '@/components/Surface';
-import { trainers, type Package, type Trainer } from '@/features/marketplace/data';
+import { useTrainer, type Package, type Trainer } from '@/features/marketplace/data';
+import { ApiError, api } from '@/lib/api';
+import type { CheckoutDto } from '@/lib/apiTypes';
+import * as WebBrowser from 'expo-web-browser';
 import { haptics } from '@/lib/haptics';
 import { useAuth } from '@/state/auth';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
@@ -25,11 +28,28 @@ function priceLabel(pkg: Package) {
 export default function TrainerProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const trainer = trainers.find((t) => t.id === id) ?? trainers[0];
-  const [packageId, setPackageId] = useState(trainer.packages[0].id);
+  const { trainer, missing } = useTrainer(id);
+  const [packageId, setPackageId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const { refresh } = useAuth();
+
+  if (!trainer) {
+    return (
+      <View style={[styles.root, styles.loading, { paddingTop: insets.top + 4 }]}>
+        <View style={styles.top}>
+          <IconButton icon="chevronLeft" onPress={() => router.back()} accessibilityLabel="Voltar" />
+        </View>
+        {missing ? (
+          <AppText variant="label" tone="muted" style={styles.center}>
+            Este PT já não está disponível no marketplace.
+          </AppText>
+        ) : (
+          <ActivityIndicator color={colors.volt} />
+        )}
+      </View>
+    );
+  }
   const selected = trainer.packages.find((p) => p.id === packageId) ?? trainer.packages[0];
-  const { account, saveProfile } = useAuth();
 
   return (
     <View style={styles.root}>
@@ -48,7 +68,7 @@ export default function TrainerProfile() {
         </View>
 
         <Reveal index={0} style={styles.header}>
-          <Portrait person={trainer.id} size={76} />
+          <Avatar photoUri={trainer.photoUri} size={76} name={trainer.name} />
           <View style={styles.flex}>
             <View style={styles.nameRow}>
               <AppText style={styles.name}>{trainer.name}</AppText>
@@ -60,7 +80,7 @@ export default function TrainerProfile() {
             <View style={styles.ratingRow}>
               <Icon name="starFilled" size={12} />
               <AppText variant="caption" tone="muted">
-                {trainer.rating} ({trainer.reviews}) · {trainer.where}
+                {trainer.rating ? `${trainer.rating} (${trainer.reviews})` : 'Sem avaliações'} · {trainer.where}
               </AppText>
             </View>
           </View>
@@ -68,11 +88,11 @@ export default function TrainerProfile() {
 
         <Reveal index={1}>
           <Card radius={16} style={styles.stats}>
-            <Stat value={String(trainer.stats.students)} label="alunos ativos" mono />
+            <Stat value={String(trainer.students)} label="alunos ativos" mono />
             <View style={styles.divider} />
-            <Stat value={trainer.stats.adherence} label="aderência média" mono />
+            <Stat value={trainer.rating ?? '—'} label="avaliação média" mono />
             <View style={styles.divider} />
-            <Stat value={trainer.stats.response} label="tempo de resposta" />
+            <Stat value={String(trainer.reviews)} label="avaliações" mono />
           </Card>
         </Reveal>
 
@@ -93,7 +113,7 @@ export default function TrainerProfile() {
                 compact
                 title={pkg.name}
                 description={pkg.description}
-                selected={pkg.id === packageId}
+                selected={pkg.id === selected?.id}
                 onPress={() => setPackageId(pkg.id)}
                 trailing={
                   <View style={styles.priceRow}>
@@ -114,7 +134,12 @@ export default function TrainerProfile() {
         locations={[0, 0.25, 1]}
         style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}
       >
-        <Button label={`Contratar · ${priceLabel(selected)}`} height={54} onPress={() => setConfirming(true)} />
+        <Button
+          label={selected ? `Contratar · ${priceLabel(selected)}` : 'Sem pacotes disponíveis'}
+          height={54}
+          disabled={!selected}
+          onPress={() => setConfirming(true)}
+        />
         <View style={styles.secure}>
           <Icon name="lock" size={12} />
           <AppText variant="overline" tone="muted" style={styles.regular}>
@@ -123,33 +148,21 @@ export default function TrainerProfile() {
         </View>
       </LinearGradient>
 
-      <HireSheet
-        visible={confirming}
-        trainer={trainer}
-        pkg={selected}
-        onClose={() => setConfirming(false)}
-        onHired={async () => {
-          setConfirming(false);
-          // Stripe isn't wired: hiring links the PT to this test account.
-          if (account?.profile?.kind === 'client') {
-            await saveProfile({
-              ...account.profile,
-              coached: true,
-              trainer: {
-                id: trainer.id,
-                name: trainer.name,
-                article: trainer.article,
-                pack: selected.name,
-                price: selected.price,
-                period: selected.period,
-              },
-            });
-            router.replace('/chat');
-          } else {
-            router.back();
-          }
-        }}
-      />
+      {selected ? (
+        <HireSheet
+          visible={confirming}
+          trainer={trainer}
+          pkg={selected}
+          onClose={() => setConfirming(false)}
+          onHired={async () => {
+            setConfirming(false);
+            // The link to the PT exists only once the payment is confirmed on the server.
+            const account = await refresh();
+            if (account?.profile?.kind === 'client' && account.profile.trainer) router.replace('/chat');
+            else Alert.alert('Pagamento por concluir', 'Quando o pagamento for confirmado, a conversa com o PT abre aqui.');
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -189,7 +202,7 @@ function HireSheet({
       accessibilityLabel="Confirmar contratação"
       header={
         <View style={styles.sheetHeader}>
-          <Portrait person={trainer.id} size={44} />
+          <Avatar photoUri={trainer.photoUri} size={44} name={trainer.name} />
           <View style={styles.flex}>
             <AppText variant="subheading">{pkg.name}</AppText>
             <AppText variant="small" tone="muted">
@@ -201,9 +214,9 @@ function HireSheet({
     >
       <View style={styles.summary}>
         <View style={styles.flex}>
-          <AppText variant="label">Cartão terminado em 4242</AppText>
+          <AppText variant="label">Pagamento com cartão (Stripe)</AppText>
           <AppText variant="caption" tone="muted">
-            {recurring ? 'Cobrado hoje e depois a cada dia 24' : 'Cobrado hoje, uma vez'}
+            {recurring ? 'Cobrado hoje · cobre o próximo mês' : 'Cobrado hoje, uma vez'}
           </AppText>
         </View>
         <AppText style={styles.amount}>{priceLabel(pkg)}</AppText>
@@ -216,19 +229,23 @@ function HireSheet({
         <Button
           label={`Confirmar e pagar ${priceLabel(pkg)}`}
           height={54}
-          onPress={() => {
+          onPress={async () => {
             setPaying(true);
-            // Stripe Connect isn't wired yet — simulate the round-trip.
-            setTimeout(() => {
-              setPaying(false);
+            try {
+              const checkout = await api.post<CheckoutDto>(`/api/v1/trainers/${trainer.id}/hire`, { packageId: pkg.id });
+              if (checkout.status === 'pending' && checkout.url) await WebBrowser.openBrowserAsync(checkout.url);
               haptics.success();
               onHired();
-            }, 900);
+            } catch (e) {
+              Alert.alert('Não foi possível contratar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+            } finally {
+              setPaying(false);
+            }
           }}
         />
       )}
       <AppText variant="caption" tone="muted" style={styles.center}>
-        {recurring ? 'Cancelas quando quiseres, sem multa. ' : ''}Pagamento seguro via Stripe.
+        {recurring ? 'Sem fidelização: decides todos os meses. ' : ''}Pagamento seguro via Stripe.
       </AppText>
     </Sheet>
   );
@@ -236,6 +253,7 @@ function HireSheet({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  loading: { paddingHorizontal: pagePadding, gap: 40 },
   content: { paddingHorizontal: pagePadding, gap: 18 },
   flex: { flex: 1, gap: 4 },
   regular: { fontFamily: fonts.ui },

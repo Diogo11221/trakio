@@ -2,18 +2,20 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import type { Person } from '@/components/Portrait';
 import { SectionLabel } from '@/components/Surface';
 import { ToolGrid } from '@/features/tools/components';
-import { clientBody, studentBodies } from '@/features/tools/data';
-import { measuredStudents, StudentPicker } from '@/features/tools/StudentPicker';
+import { clientBody } from '@/features/tools/data';
+import { StudentPicker } from '@/features/tools/StudentPicker';
+import { useTrainer } from '@/features/pt/store';
+import { useStudent } from '@/features/pt/useStudent';
 import { ToolScreen } from '@/features/tools/ToolScreen';
 
 /** PT · Ferramentas: calculadoras com os dados de um aluno. */
 export default function TrainerTools() {
   const params = useLocalSearchParams<{ student?: string }>();
-  const initial = measuredStudents.find((s) => s.id === params.student)?.id ?? measuredStudents[0]?.id ?? 'miguel';
-  const [student, setStudent] = useState<Person>(initial);
+  const { students } = useTrainer();
+  const [student, setStudent] = useState<string | null>(params.student ?? students[0]?.id ?? null);
+  const { body } = useStudent(student ?? undefined);
 
   return (
     <ToolScreen
@@ -22,13 +24,13 @@ export default function TrainerTools() {
       top={
         <View style={styles.top}>
           <SectionLabel>Para quem?</SectionLabel>
-          <StudentPicker value={student} onChange={setStudent} />
+          <StudentPicker students={students} value={student} onChange={setStudent} />
         </View>
       }
     >
       <ToolGrid
-        body={studentBodies[student] ?? clientBody}
-        onOpen={(id) => router.push({ pathname: '/pt/tools/[id]', params: { id, student } })}
+        body={body ?? clientBody}
+        onOpen={(id) => router.push({ pathname: '/pt/tools/[id]', params: student ? { id, student } : { id } })}
       />
     </ToolScreen>
   );

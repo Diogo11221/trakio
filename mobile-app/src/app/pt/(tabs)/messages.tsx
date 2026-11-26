@@ -5,24 +5,25 @@ import Animated from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { lastMessagePreview } from '@/features/pt/data';
-import { useTrainer } from '@/features/pt/store';
-import { refreshMockData } from '@/lib/refresh';
+import { apiUrl } from '@/lib/api';
+import { refreshAll } from '@/lib/refresh';
+import { useChat } from '@/state/chat';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts } from '@/theme/tokens';
 
 /** PT · Mensagens. */
 export default function Messages() {
-  const { conversations } = useTrainer();
+  const { list: conversations } = useChat();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const list = conversations.filter((c) => !q || c.name.toLowerCase().includes(q));
+  const list = conversations.filter((c) => !q || c.other.name.toLowerCase().includes(q));
 
   return (
-    <Screen gap={16} onRefresh={refreshMockData}>
+    <Screen gap={16} onRefresh={refreshAll}>
       <Reveal index={0}>
         <AppText variant="title">Mensagens</AppText>
       </Reveal>
@@ -42,6 +43,11 @@ export default function Messages() {
       </Reveal>
 
       <Reveal index={2}>
+        {list.length === 0 ? (
+          <AppText variant="small" tone="muted">
+            As conversas aparecem quando um aluno te contrata.
+          </AppText>
+        ) : null}
         {list.map((conversation) => {
           const unread = conversation.unread > 0;
           return (
@@ -49,15 +55,15 @@ export default function Messages() {
               <PressableScale
                 onPress={() => router.push({ pathname: '/pt/chat/[id]', params: { id: conversation.id } })}
                 pressedScale={0.985}
-                accessibilityLabel={`${conversation.name}${unread ? `, ${conversation.unread} por ler` : ''}`}
+                accessibilityLabel={`${conversation.other.name}${unread ? `, ${conversation.unread} por ler` : ''}`}
               >
                 <View style={styles.row}>
-                  <Portrait person={conversation.id} size={48} />
+                  <Avatar photoUri={conversation.other.photoUrl ? apiUrl(conversation.other.photoUrl) : null} size={48} name={conversation.other.name} />
                   <View style={styles.flex}>
                     <View style={styles.line}>
-                      <AppText style={[styles.name, unread && styles.nameUnread]}>{conversation.name}</AppText>
+                      <AppText style={[styles.name, unread && styles.nameUnread]}>{conversation.other.name}</AppText>
                       <AppText variant="caption" tone={unread ? 'volt' : 'muted'}>
-                        {conversation.time}
+                        {conversation.last?.time ?? ''}
                       </AppText>
                     </View>
                     <View style={styles.line}>
@@ -67,7 +73,7 @@ export default function Messages() {
                         numberOfLines={1}
                         style={styles.preview}
                       >
-                        {lastMessagePreview(conversation)}
+                        {lastMessagePreview(conversation.last)}
                       </AppText>
                       {unread ? (
                         <View style={styles.badge}>

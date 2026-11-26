@@ -6,13 +6,15 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { AppText } from '@/components/AppText';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { Card } from '@/components/Surface';
 import { AdherenceBar, StudentTagPill } from '@/features/pt/components';
-import { students, type Student } from '@/features/pt/data';
-import { refreshMockData } from '@/lib/refresh';
+import type { Student } from '@/features/pt/data';
+import { useTrainer } from '@/features/pt/store';
+import { refreshAll } from '@/lib/refresh';
+import { useTrainerProfile } from '@/state/auth';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -37,6 +39,8 @@ export default function Students() {
     if (params.filter) setFilter(params.filter);
   }
 
+  const { students } = useTrainer();
+  const { name } = useTrainerProfile();
   const q = query.trim().toLowerCase();
   const active = filters.find((f) => f.value === filter) ?? filters[0];
   const list = students.filter(
@@ -45,11 +49,11 @@ export default function Students() {
 
   const invite = () =>
     Share.share({
-      message: 'Junta-te a mim no Trakio para acompanharmos os teus treinos: https://trakio.pt/convite/rita',
+      message: `Treina comigo no Trakio: procura ${name} no marketplace de Personal Trainers da app.`,
     });
 
   return (
-    <Screen gap={16} onRefresh={refreshMockData}>
+    <Screen gap={16} onRefresh={refreshAll}>
       <Reveal index={0} style={styles.header}>
         <AppText variant="title">Alunos</AppText>
         <PressableScale onPress={invite} style={styles.invite} accessibilityRole="button" accessibilityLabel="Convidar aluno">
@@ -98,7 +102,7 @@ export default function Students() {
                 accessibilityLabel={student.name}
               >
                 <View style={[styles.row, i < list.length - 1 && styles.divider]}>
-                  <Portrait person={student.id} size={44} />
+                  <Avatar photoUri={student.photoUri} size={44} name={student.name} />
                   <View style={styles.flex}>
                     <View style={styles.nameRow}>
                       <AppText style={styles.name}>{student.name}</AppText>
