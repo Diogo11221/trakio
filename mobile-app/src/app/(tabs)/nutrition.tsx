@@ -28,7 +28,8 @@ import { haptics } from '@/lib/haptics';
 import { useSettings } from '@/state/settings';
 import { enterRise } from '@/theme/motion';
 import { colors, fonts, springs } from '@/theme/tokens';
-import { refreshMockData } from '@/lib/refresh';
+import { refreshAll } from '@/lib/refresh';
+import { protectedImage } from '@/lib/api';
 
 /** How far back the day picker goes. */
 const MAX_DAYS_BACK = 30;
@@ -47,7 +48,7 @@ function dayLabel(offset: number, date: Date): string {
 
 /** Cliente · Nutrição — diary by day (saved on the phone), goals from the profile. */
 export default function Nutrition() {
-  const { premium, setPremium } = useSettings();
+  const { premium } = useSettings();
   const profile = useClientProfile();
   const { mealsOn, removeMeal } = useDiary();
   const [dayOffset, setDayOffset] = useState(0);
@@ -84,7 +85,7 @@ export default function Nutrition() {
         style: 'destructive',
         onPress: () => {
           haptics.warning();
-          removeMeal(day, meal.id);
+          removeMeal(day, meal.id).catch(() => Alert.alert('Não foi possível apagar', 'Tenta outra vez.'));
         },
       },
     ]);
@@ -94,7 +95,7 @@ export default function Nutrition() {
       <Screen
         gap={18}
         bottomInset={96}
-        onRefresh={refreshMockData}
+        onRefresh={refreshAll}
         overlay={
           <Animated.View entering={enterRise(380)} style={styles.fabWrap}>
             <PressableScale onPress={openLogger} haptic="press" style={styles.fab} accessibilityLabel="Registar com IA">
@@ -179,7 +180,7 @@ export default function Nutrition() {
                     accessibilityLabel={`${slot.name}: ${summary(meal.items)}, ${t.kcal} kcal. Toca para apagar.`}
                   >
                     <CardRow last={last && j === logged.length - 1} style={styles.meal}>
-                      {meal.photoUri ? <Image source={{ uri: meal.photoUri }} style={styles.mealPhoto} contentFit="cover" /> : null}
+                      {meal.photoUri ? <Image source={protectedImage(meal.photoUri)} style={styles.mealPhoto} contentFit="cover" /> : null}
                       <View style={styles.flex}>
                         <View style={styles.mealTitle}>
                           <AppText variant="label" style={styles.mealName}>
@@ -218,7 +219,6 @@ export default function Nutrition() {
         visible={premiumOpen}
         onClose={() => setPremiumOpen(false)}
         onActivated={() => {
-          setPremium(true);
           setPremiumOpen(false);
           setTimeout(() => router.push({ pathname: '/meal-log', params: { day } }), 320);
         }}

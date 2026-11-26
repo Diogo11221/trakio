@@ -3,14 +3,15 @@ import { useState } from 'react';
 import thumb from '../assets/figma/render-bench-thumb.jpg';
 import { Icon } from '../components/Icon';
 import { Button, Card, ConfirmDialog, fieldStyles, PageHeader, RowMenu, SearchField, StatusPill, Tabs, type Tone } from '../components/ui';
-import { demoTotals, exercises as sampleExercises, type DemoStatus, type Exercise } from '../data/mock';
-import { useAdmin } from '../data/store';
+import { ApiError, api } from '../api';
+import { useAdmin, useApi } from '../data/store';
+import { groupLabels, type DemoStatus, type ExerciseRow, type MuscleGroup, type Page } from '../data/types';
 import p from './pages.module.css';
 import s from './Library.module.css';
 
-type Group = 'all' | Exercise['group'];
+type Group = 'all' | MuscleGroup;
 
-const groups: Exercise['group'][] = ['Peito', 'Costas', 'Pernas', 'Ombros', 'Braços', 'Core'];
+const groups: MuscleGroup[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
 
 const demoInfo: Record<DemoStatus, { tone: Tone; label: string }> = {
   ready: { tone: 'success', label: 'Pronta' },
@@ -20,21 +21,32 @@ const demoInfo: Record<DemoStatus, { tone: Tone; label: string }> = {
 
 /** Admin · Biblioteca de exercícios. */
 export function Library() {
-  const { exercises, addExercise, setDemoStatus, notify } = useAdmin();
+  const { notify } = useAdmin();
   const [group, setGroup] = useState<Group>('all');
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState({ name: '', group: 'Peito' as Exercise['group'], muscles: '', equipment: '' });
+  const [draft, setDraft] = useState<{ name: string; group: MuscleGroup; muscles: string; equipment: string }>({ name: '', group: 'chest', muscles: '', equipment: '' });
 
-  const q = query.trim().toLowerCase();
-  const list = exercises.filter(
-    (e) => (group === 'all' || e.group === group) && (!q || e.name.toLowerCase().includes(q) || e.muscles.toLowerCase().includes(q)),
-  );
-  // demoTotals covers the whole library; the sample rows shown here are part of it,
-  // so changes made in this session are applied as a delta on top.
-  const countBy = (rows: Exercise[], demo: DemoStatus) => rows.filter((e) => e.demo === demo).length;
-  const live = (demo: DemoStatus) => demoTotals[demo] + countBy(exercises, demo) - countBy(sampleExercises, demo);
+  const params = new URLSearchParams({ size: '100' });
+  if (query.trim()) params.set('q', query.trim());
+  if (group !== 'all') params.set('group', group);
+  const { data, reload } = useApi<Page<ExerciseRow>>(`/api/v1/admin/exercises?${params.toString()}`);
+  const totals = useApi<Record<DemoStatus, number>>('/api/v1/admin/exercises/demo-totals');
+  const list = data?.content ?? [];
+  const live = (demo: DemoStatus) => totals.data?.[demo] ?? 0;
   const total = live('ready') + live('production') + live('todo');
+
+  const save = async (task: () => Promise<unknown>, message: string) => {
+    try {
+      await task();
+      notify(message);
+      await Promise.all([reload(), totals.reload()]);
+      return true;
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : 'Não foi possível guardar.');
+      return false;
+    }
+  };
 
   return (
     <>
@@ -68,7 +80,7 @@ export function Library() {
       </Card>
 
       <div className={p.toolbar}>
-        <Tabs label="Grupo muscular" value={group} onChange={setGroup} options={[{ value: 'all', label: 'Todos' }, ...groups.map((g) => ({ value: g, label: g }))]} />
+        <Tabs label="Grupo muscular" value={group} onChange={setGroup} options={[{ value: 'all', label: 'Todos' }, ...groups.map((g) => ({ value: g, label: groupLabels[g] }))]} />
         <SearchField value={query} onChange={setQuery} placeholder="Procurar exercício" width={260} />
       </div>
 
@@ -86,13 +98,13 @@ export function Library() {
           </thead>
           <tbody>
             {list.map((e) => {
-              const info = demoInfo[e.demo];
+              const info = demoInfo[e.demoStatus];
               return (
-                <tr key={e.id} className={e.id.startsWith('e-') ? s.newRow : undefined}>
+                <tr key={e.id}>
                   <td>
                     <span className={p.person} style={{ gap: 14 }}>
                       <span className={s.thumb}>
-                        {e.thumb ? <img src={thumb} alt="" className={s.thumbImg} /> : <Icon name="dumbbell" size={20} />}
+                        {e.demoStatus === 'ready' ? <img src={thumb} alt="" className={s.thumbImg} /> : <Icon name="dumbbell" size={20} />}
                       </span>
                       <span className={p.strong}>{e.name}</span>
                     </span>
@@ -107,18 +119,26 @@ export function Library() {
                     <RowMenu
                       label={`Ações para ${e.name}`}
                       items={[
-                        ...(e.demo !== 'ready'
+                        ...(e.demoStatus !== 'ready'
                           ? [
                               {
-                                label: e.demo === 'todo' ? 'Pedir demonstração 3D' : 'Marcar demonstração como pronta',
+                                label: e.demoStatus === 'todo' ? 'Pedir demonstração 3D' : 'Marcar demonstração como pronta',
                                 onSelect: () => {
-                                  setDemoStatus(e.id, e.demo === 'todo' ? 'production' : 'ready');
-                                  notify(e.demo === 'todo' ? `Demonstração de “${e.name}” pedida à equipa de 3D.` : `A demonstração de “${e.name}” está pronta.`);
+                                  const next = e.demoStatus === 'todo' ? 'production' : 'ready';
+                                  save(
+                                    () => api.put(`/api/v1/admin/exercises/${e.id}/demo-status`, { demoStatus: next }),
+                                    next === 'production' ? `Demonstração de “${e.name}” pedida à equipa de 3D.` : `A demonstração de “${e.name}” está pronta.`,
+                                  );
                                 },
                               },
                             ]
-                          : []),
-                        { label: 'Editar', onSelect: () => notify('A edição de exercícios chega com a API da biblioteca.') },
+                          : [
+                              {
+                                label: 'Voltar a pôr em produção',
+                                onSelect: () =>
+                                  save(() => api.put(`/api/v1/admin/exercises/${e.id}/demo-status`, { demoStatus: 'production' }), `“${e.name}” voltou para produção.`),
+                              },
+                            ]),
                       ]}
                     />
                   </td>
@@ -127,7 +147,7 @@ export function Library() {
             })}
           </tbody>
         </table>
-        {list.length === 0 ? <p className={p.empty}>Nenhum exercício encontrado.</p> : null}
+        {data && list.length === 0 ? <p className={p.empty}>Nenhum exercício encontrado.</p> : null}
       </Card>
 
       <ConfirmDialog
@@ -136,14 +156,23 @@ export function Library() {
         body="Fica disponível para os PTs logo a seguir. A demonstração 3D é pedida à parte."
         confirmLabel="Adicionar"
         onClose={() => setAdding(false)}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (draft.name.trim().length < 3) {
             notify('Dá um nome ao exercício.');
             return;
           }
-          addExercise({ name: draft.name.trim(), group: draft.group, muscles: draft.muscles.trim() || draft.group, equipment: draft.equipment.trim() || '—' });
-          notify(`“${draft.name.trim()}” adicionado à biblioteca.`);
-          setDraft({ name: '', group: 'Peito', muscles: '', equipment: '' });
+          const ok = await save(
+            () =>
+              api.post('/api/v1/admin/exercises', {
+                name: draft.name.trim(),
+                group: draft.group,
+                muscles: draft.muscles.trim() || groupLabels[draft.group],
+                equipment: draft.equipment.trim(),
+              }),
+            `“${draft.name.trim()}” adicionado à biblioteca.`,
+          );
+          if (!ok) return;
+          setDraft({ name: '', group: 'chest', muscles: '', equipment: '' });
           setAdding(false);
           setGroup('all');
         }}
@@ -163,7 +192,7 @@ export function Library() {
                 onClick={() => setDraft({ ...draft, group: g })}
                 aria-pressed={draft.group === g}
               >
-                {g}
+                {groupLabels[g]}
               </button>
             ))}
           </div>

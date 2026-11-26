@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 
-import { buildWorkout, planTemplates, type Exercise, type WorkoutPlan } from '@/features/workout/data';
+import type { Exercise, WorkoutPlan } from '@/features/workout/data';
+import { api } from '@/lib/api';
 import { accountKey, isRecord } from '@/lib/persist';
 import { useAuth } from '@/state/auth';
 
@@ -54,10 +55,23 @@ function stateFor(plan: WorkoutPlan): WorkoutState {
   };
 }
 
-/** Placeholder until a plan is loaded from Hoje / Treinar. */
+/** Placeholder until a plan is loaded from Hoje / Treinar (never shown). */
+const placeholder: WorkoutPlan = {
+  id: 'livre',
+  title: '',
+  focus: '',
+  estimatedMinutes: 0,
+  exercises: [{ id: '-', name: '', prescription: '', short: '', restSeconds: 60, sets: [], status: 'current' }],
+};
+
 function initialState(): WorkoutState {
-  const a = planTemplates[0]!;
-  return stateFor(buildWorkout(a, a.exercises, () => null, 1));
+  return stateFor(placeholder);
+}
+
+type SavedWorkout = { state: WorkoutState; savedAt: number };
+
+function isWorkoutState(raw: unknown): raw is WorkoutState {
+  return isRecord(raw) && isRecord(raw.plan) && typeof raw.startedAt === 'number' && Array.isArray(raw.plan.exercises);
 }
 
 export function activeSetIndex(exercise: Exercise): number {
@@ -232,39 +246,59 @@ const WorkoutContext = createContext<WorkoutContextValue | null>(null);
 export function WorkoutProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const { account } = useAuth();
-  const key = accountKey(account?.id, 'live-workout');
+  const key = account?.role === 'client' ? accountKey(account.id, 'live-workout') : null;
   // Don't overwrite the saved workout before it has been read back.
   const loadedKey = useRef<string | null>(null);
 
-  // A workout left half-way ("Sair e continuar depois", or the app closed) comes back on launch.
+  // A workout left half-way ("Sair e continuar depois", or the app closed) comes back on launch:
+  // whichever copy is newer, the one on this phone or the one on the server (another phone).
   useEffect(() => {
     if (!key) {
       dispatch({ type: 'reset' });
       return;
     }
     let alive = true;
-    AsyncStorage.getItem(key)
-      .then((raw) => {
-        if (!alive) return;
-        loadedKey.current = key;
-        if (!raw) return;
-        const saved: unknown = JSON.parse(raw);
-        if (isRecord(saved) && isRecord(saved.plan) && typeof saved.startedAt === 'number') {
-          dispatch({ type: 'restore', state: saved as WorkoutState });
+    (async () => {
+      let local: SavedWorkout | null = null;
+      try {
+        const raw = await AsyncStorage.getItem(key);
+        const parsed: unknown = raw ? JSON.parse(raw) : null;
+        if (isRecord(parsed) && isWorkoutState(parsed.state) && typeof parsed.savedAt === 'number') {
+          local = { state: parsed.state, savedAt: parsed.savedAt };
         }
-      })
-      .catch(() => {
-        loadedKey.current = key;
-      });
+      } catch {
+        local = null;
+      }
+      let remote: SavedWorkout | null = null;
+      try {
+        const live = await api.get<{ state: unknown; updatedAt: string } | undefined>('/api/v1/me/live-workout');
+        if (live && isWorkoutState(live.state)) remote = { state: live.state, savedAt: Date.parse(live.updatedAt) };
+      } catch {
+        remote = null;
+      }
+      if (!alive) return;
+      loadedKey.current = key;
+      const newest = local && remote ? (local.savedAt >= remote.savedAt ? local : remote) : (local ?? remote);
+      if (newest && newest.state.finishedAt === null) dispatch({ type: 'restore', state: newest.state });
+    })();
     return () => {
       alive = false;
     };
   }, [key]);
 
+  const upload = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!key || loadedKey.current !== key) return;
     const live = state.startedAt !== null && state.finishedAt === null;
-    (live ? AsyncStorage.setItem(key, JSON.stringify(state)) : AsyncStorage.removeItem(key)).catch(() => undefined);
+    if (upload.current) clearTimeout(upload.current);
+    if (live) {
+      AsyncStorage.setItem(key, JSON.stringify({ state, savedAt: Date.now() })).catch(() => undefined);
+      // Server copy a moment later, so a burst of taps is one request.
+      upload.current = setTimeout(() => api.put('/api/v1/me/live-workout', state).catch(() => undefined), 2000);
+    } else {
+      AsyncStorage.removeItem(key).catch(() => undefined);
+      if (state.startedAt !== null) api.delete('/api/v1/me/live-workout').catch(() => undefined);
+    }
   }, [key, state]);
 
   // Actions only close over `dispatch` (stable), so they keep their identity across renders.

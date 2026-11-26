@@ -363,7 +363,7 @@ public class BillingService {
         Map<UUID, String> names = clients.findByUserIdIn(current.stream().map(Payment::getPayerId).filter(id -> id != null).toList())
                 .stream().collect(Collectors.toMap(ClientProfile::getUserId, ClientProfile::getName));
         return new Earnings(month.toString(), received, fee, received - fee, change, current.stream()
-                .map(p -> new EarningPayment(p.getId(), names.getOrDefault(p.getPayerId(), "Conta removida"), p.getDescription(),
+                .map(p -> new EarningPayment(p.getId(), p.getPayerId(), names.getOrDefault(p.getPayerId(), "Conta removida"), p.getDescription(),
                         p.getAmountCents(), p.getFeeCents(), p.netCents(), p.getStatus(), p.getPaidAt()))
                 .toList());
     }

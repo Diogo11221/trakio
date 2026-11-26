@@ -7,7 +7,6 @@ import com.trakio.core.billing.BillingDtos.CheckoutView;
 import com.trakio.core.billing.BillingService;
 import com.trakio.core.billing.PaymentEvents;
 import com.trakio.core.chat.ChatService;
-import com.trakio.core.coaching.CoachingDtos.Attention;
 import com.trakio.core.coaching.CoachingDtos.StudentDetail;
 import com.trakio.core.coaching.CoachingDtos.StudentView;
 import com.trakio.core.coaching.CoachingDtos.TopLift;
@@ -42,7 +41,6 @@ public class CoachingService {
 
     private static final Logger log = LoggerFactory.getLogger(CoachingService.class);
     private static final int DEFAULT_WEEKS = 12;
-    private static final double ATTENTION_ADHERENCE = 0.7;
 
     private final CoachingRelationshipRepository relationships;
     private final TrainerPackageRepository packages;
@@ -54,12 +52,13 @@ public class CoachingService {
     private final MarketplaceService marketplace;
     private final BillingService billing;
     private final ChatService chat;
+    private final SuggestionService suggestions;
     private final Clock clock;
 
     public CoachingService(CoachingRelationshipRepository relationships, TrainerPackageRepository packages,
             ClientProfileRepository clients, UserRepository users, WorkoutPlanRepository plans,
             WorkoutSessionRepository sessions, ProgressService progress, MarketplaceService marketplace,
-            BillingService billing, ChatService chat, Clock clock) {
+            BillingService billing, ChatService chat, SuggestionService suggestions, Clock clock) {
         this.relationships = relationships;
         this.packages = packages;
         this.clients = clients;
@@ -70,6 +69,7 @@ public class CoachingService {
         this.marketplace = marketplace;
         this.billing = billing;
         this.chat = chat;
+        this.suggestions = suggestions;
         this.clock = clock;
     }
 
@@ -182,13 +182,14 @@ public class CoachingService {
     public StudentDetail student(UUID trainerId, UUID clientId) {
         CoachingRelationship rel = requireActiveStudent(trainerId, clientId);
         ClientProfile profile = clients.findByUserId(clientId).orElseThrow(() -> ApiException.notFound("Este aluno"));
-        StudentView view = view(rel, profile);
         Load load = load(rel, profile);
+        var result = suggestions.forStudent(trainerId, clientId, firstName(profile.getName()), load.done(), load.expected());
+        StudentView view = view(rel, profile, load, result);
         var summary = progress.summary(clientId, 8);
         TopLift top = summary.exercises().stream().max(Comparator.comparingDouble(e -> e.currentMax()))
                 .map(e -> new TopLift(e.exercise(), e.name(), e.currentMax(), e.changePercent())).orElse(null);
-        return new StudentDetail(view, profile.age(), profile.getHeightCm(), profile.getWeightKg(), profile.getGoalWeightKg(),
-                load.done(), load.expected(), top);
+        return new StudentDetail(view, profile.age(), profile.getSex(), profile.getHeightCm(), profile.getWeightKg(),
+                profile.getGoalWeightKg(), profile.getActivity(), load.done(), load.expected(), top, result.suggestions());
     }
 
     private record Load(int done, int expected, int weeks, int workoutsPerWeek) {}
@@ -209,27 +210,27 @@ public class CoachingService {
 
     private StudentView view(CoachingRelationship rel, ClientProfile profile) {
         Load load = load(rel, profile);
+        return view(rel, profile, load,
+                suggestions.forStudent(rel.getTrainerId(), rel.getClientId(), firstName(profile.getName()), load.done(), load.expected()));
+    }
+
+    private StudentView view(CoachingRelationship rel, ClientProfile profile, Load load, SuggestionService.Result result) {
         Instant now = clock.instant();
         long days = Duration.between(rel.getStartedAt(), now).toDays();
         int week = (int) Math.min(load.weeks(), days / 7 + 1);
-        Double adherence = load.expected() == 0 ? null : Math.min(1.0, (double) load.done() / load.expected());
-        String tag = null;
-        Attention attention = null;
-        if (days < 7) {
-            tag = "new";
-        } else if (adherence != null && adherence < ATTENTION_ADHERENCE) {
-            tag = "attention";
-            attention = new Attention("missed-workouts", load.done(), load.expected(), null);
-        } else {
-            var stalled = progress.summary(rel.getClientId(), 6).exercises().stream().filter(e -> e.stalled()).findFirst();
-            if (stalled.isPresent()) {
-                tag = "attention";
-                attention = new Attention("stalled", null, null, stalled.get().name());
-            }
-        }
+        // In the first week there's nothing fair to measure yet.
+        Double adherence = days < 7 || load.expected() == 0 ? null : Math.min(1.0, (double) load.done() / load.expected());
+        var top = result.suggestions().isEmpty() ? null : result.suggestions().getFirst();
+        String tag = top != null ? "attention" : days < 7 ? "new" : null;
         return new StudentView(rel.getClientId(), rel.getId(), profile.getName(), FileService.url(profile.getPhotoFileId()),
                 profile.getGoal(), week, load.weeks(), adherence == null ? null : Math.round(adherence * 100) / 100.0, tag,
-                attention, rel.getPackageName(), rel.getPriceCents(), rel.getPeriod(), rel.getStartedAt(),
+                result.readiness(), top, rel.getPackageName(), rel.getPriceCents(), rel.getPeriod(), rel.getStartedAt(),
                 chat.conversationId(rel.getTrainerId(), rel.getClientId()).orElse(null));
+    }
+
+    static String firstName(String name) {
+        String trimmed = name.trim();
+        int space = trimmed.indexOf(' ');
+        return space < 0 ? trimmed : trimmed.substring(0, space);
     }
 }

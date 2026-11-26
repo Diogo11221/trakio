@@ -14,6 +14,7 @@ import { WorkoutProvider } from '@/features/workout/store';
 import { DiaryProvider } from '@/features/nutrition/diary';
 import { WeightProvider } from '@/features/progress/weight';
 import { HistoryProvider } from '@/features/workout/history';
+import { PlanProvider } from '@/features/workout/plan';
 import { AuthProvider } from '@/state/auth';
 import { ChatProvider } from '@/state/chat';
 import { SettingsProvider } from '@/state/settings';
@@ -50,6 +51,7 @@ export default function RootLayout() {
         <AuthProvider>
           <SettingsProvider>
             <ChatProvider>
+              <PlanProvider>
               <HistoryProvider>
                 <DiaryProvider>
                   <WeightProvider>
@@ -87,6 +89,7 @@ export default function RootLayout() {
                   </WeightProvider>
                 </DiaryProvider>
               </HistoryProvider>
+              </PlanProvider>
             </ChatProvider>
           </SettingsProvider>
         </AuthProvider>

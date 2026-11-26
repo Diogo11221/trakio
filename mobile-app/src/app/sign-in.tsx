@@ -9,7 +9,7 @@ import { Logo } from '@/components/Logo';
 import { Reveal } from '@/components/Screen';
 import { Chip } from '@/components/Chip';
 import { AuthFields, FormError } from '@/features/auth/AuthForm';
-import { DEMO_PASSWORD, demoLogins } from '@/features/auth/localAuth';
+import { DEMO_PASSWORD, demoLogins } from '@/features/auth/remoteAuth';
 import { AuthError } from '@/features/auth/types';
 import { haptics } from '@/lib/haptics';
 import { homeFor, useAuth } from '@/state/auth';
@@ -48,7 +48,7 @@ export default function SignIn() {
   };
 
   const notYet = () =>
-    Alert.alert('Ainda não disponível', 'Na versão de teste entra-se com email e palavra-passe.');
+    Alert.alert('Ainda não disponível', 'Por agora entra-se com email e palavra-passe. Se te esqueceste da palavra-passe, escreve para suporte@trakio.app.');
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -87,9 +87,10 @@ export default function SignIn() {
         <Reveal index={5}>
           <Button label={busy ? 'A entrar…' : 'Entrar'} height={54} disabled={busy} onPress={enter} />
         </Reveal>
+        {demoLogins.length > 0 ? (
         <Reveal index={5} style={styles.demo}>
           <AppText variant="caption" tone="muted">
-            Contas de teste
+            Contas de teste (servidor de desenvolvimento)
           </AppText>
           <View style={styles.demoChips}>
             {demoLogins.map((demo) => (
@@ -107,6 +108,7 @@ export default function SignIn() {
             ))}
           </View>
         </Reveal>
+        ) : null}
         <Reveal index={6} style={styles.divider}>
           <View style={styles.rule} />
           <AppText variant="small" tone="muted">

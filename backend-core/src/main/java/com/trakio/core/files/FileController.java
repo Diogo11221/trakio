@@ -36,9 +36,20 @@ class FileController {
     }
 
     private final FileService files;
+    private final FileLinks links;
+    private final StoredFileRepository repository;
 
-    FileController(FileService files) {
+    FileController(FileService files, FileLinks links, StoredFileRepository repository) {
         this.files = files;
+        this.links = links;
+        this.repository = repository;
+    }
+
+    /** A 5-minute link to open the file without the bearer header (e.g. a PDF in the browser). */
+    @PostMapping("/api/v1/files/{id}/link")
+    FileLinks.Link link(@AuthenticationPrincipal AuthUser me, @PathVariable UUID id) {
+        files.authorizeRead(me, id);
+        return links.create(id);
     }
 
     @PostMapping(path = "/api/v1/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -56,9 +67,16 @@ class FileController {
     }
 
     @GetMapping("/api/v1/files/{id}")
-    ResponseEntity<InputStreamResource> download(@AuthenticationPrincipal AuthUser me, @PathVariable UUID id)
-            throws IOException {
-        StoredFile file = files.authorizeRead(me, id);
+    ResponseEntity<InputStreamResource> download(@AuthenticationPrincipal AuthUser me, @PathVariable UUID id,
+            @RequestParam(required = false) Long exp, @RequestParam(required = false) String sig) throws IOException {
+        StoredFile file;
+        if (me != null) {
+            file = files.authorizeRead(me, id);
+        } else if (exp != null && links.valid(id, exp, sig)) {
+            file = repository.findById(id).orElseThrow(() -> ApiException.notFound("Este ficheiro"));
+        } else {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "unauthenticated", "Inicia sessão para continuar.");
+        }
         MediaType type = MediaType.parseMediaType(file.getContentType());
         boolean image = type.getType().equals("image");
         ContentDisposition disposition = (image ? ContentDisposition.inline() : ContentDisposition.attachment())

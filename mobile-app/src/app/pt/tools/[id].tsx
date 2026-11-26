@@ -1,66 +1,67 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
-import type { Person } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { SectionLabel } from '@/components/Surface';
-import { students } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
-import { clientBody, isToolId, studentBodies, toolInfo } from '@/features/tools/data';
-import { measuredStudents, StudentPicker } from '@/features/tools/StudentPicker';
+import { useStudent } from '@/features/pt/useStudent';
+import { clientBody, isToolId, toolInfo } from '@/features/tools/data';
+import { StudentPicker } from '@/features/tools/StudentPicker';
 import { ToolScreen } from '@/features/tools/ToolScreen';
 import { ToolView } from '@/features/tools/views';
-import { formatTimeOfDay } from '@/lib/format';
+import { ApiError, api } from '@/lib/api';
 import { haptics } from '@/lib/haptics';
 import { colors, fonts } from '@/theme/tokens';
 
 /** PT · uma calculadora, com os dados do aluno escolhido e envio pelo chat. */
 export default function TrainerTool() {
   const params = useLocalSearchParams<{ id: string; student?: string }>();
-  const initial = measuredStudents.find((s) => s.id === params.student)?.id ?? measuredStudents[0]?.id ?? 'miguel';
-  const [student, setStudent] = useState<Person>(initial);
+  const { students } = useTrainer();
+  const [student, setStudent] = useState<string | null>(params.student ?? students[0]?.id ?? null);
   const [sentFor, setSentFor] = useState<string | null>(null);
-  const { conversations } = useTrainer();
+  const { detail, body } = useStudent(student ?? undefined);
 
   if (!isToolId(params.id)) return <Redirect href="/pt/tools" />;
   const tool = params.id;
-  const firstName = students.find((s) => s.id === student)?.firstName ?? 'aluno';
+  const chosen = students.find((s) => s.id === student);
   // "Enviar ao Miguel" / "Enviar à Ana".
-  const toName = `${studentBodies[student]?.sex === 'female' ? 'à' : 'ao'} ${firstName}`;
-  const hasChat = conversations.some((c) => c.id === student);
+  const toName = chosen ? `${detail?.sex === 'female' ? 'à' : 'ao'} ${chosen.firstName}` : '';
 
   return (
     <ToolScreen
       title={toolInfo[tool].title}
       description={toolInfo[tool].description}
       top={
-        <View style={styles.top}>
-          <SectionLabel>Para quem?</SectionLabel>
-          <StudentPicker
-            value={student}
-            onChange={(next) => {
-              setStudent(next);
-              setSentFor(null);
-            }}
-          />
-        </View>
+        students.length > 0 ? (
+          <View style={styles.top}>
+            <SectionLabel>Para quem?</SectionLabel>
+            <StudentPicker
+              students={students}
+              value={student}
+              onChange={(next) => {
+                setStudent(next);
+                setSentFor(null);
+              }}
+            />
+          </View>
+        ) : undefined
       }
     >
       {/* Remount per student so every field starts from that student's measurements. */}
-      <View key={student} style={styles.body}>
+      <View key={`${student}-${body ? 'loaded' : 'default'}`} style={styles.body}>
         <ToolView
           tool={tool}
-          initial={studentBodies[student] ?? clientBody}
+          initial={body ?? clientBody}
           footer={(summary) =>
-            hasChat ? (
+            chosen?.conversationId ? (
               <SendFooter
                 summary={summary}
-                student={student}
+                conversationId={chosen.conversationId}
                 toName={toName}
                 sent={sentFor === summary}
                 onSent={() => setSentFor(summary)}
@@ -76,27 +77,33 @@ export default function TrainerTool() {
 /** "Enviar ao Miguel" → posts the result in the student's chat, then offers to open it. */
 function SendFooter({
   summary,
-  student,
+  conversationId,
   toName,
   sent,
   onSent,
 }: {
   summary: string;
-  student: Person;
+  conversationId: string;
   toName: string;
   sent: boolean;
   onSent: () => void;
 }) {
-  const { sendMessage } = useTrainer();
+  const [busy, setBusy] = useState(false);
 
-  const send = () => {
-    const now = new Date();
-    sendMessage(student, { id: `m-${now.getTime()}`, from: 'me', kind: 'text', text: summary, time: formatTimeOfDay(now) });
-    haptics.success();
-    onSent();
+  const send = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/api/v1/conversations/${conversationId}/messages`, { kind: 'text', text: summary });
+      haptics.success();
+      onSent();
+    } catch (e) {
+      Alert.alert('Não foi possível enviar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  if (!sent) return <Button label={`Enviar ${toName}`} variant="outline" height={50} onPress={send} />;
+  if (!sent) return <Button label={`Enviar ${toName}`} variant="outline" height={50} disabled={busy} onPress={send} />;
   return (
     <Animated.View entering={FadeIn.duration(220)} style={styles.sent}>
       <Icon name="checkVolt" size={16} />
@@ -104,7 +111,7 @@ function SendFooter({
         Enviado {toName}
       </AppText>
       <PressableScale
-        onPress={() => router.push({ pathname: '/pt/chat/[id]', params: { id: student } })}
+        onPress={() => router.push({ pathname: '/pt/chat/[id]', params: { id: conversationId } })}
         haptic="tap"
         accessibilityRole="button"
       >

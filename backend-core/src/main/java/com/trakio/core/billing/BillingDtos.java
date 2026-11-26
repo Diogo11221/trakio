@@ -33,7 +33,7 @@ public final class BillingDtos {
 
     public record RefundRequestInput(@NotBlank @Size(max = 1000) String reason) {}
 
-    public record EarningPayment(UUID id, String student, String description, long amountCents, long feeCents,
+    public record EarningPayment(UUID id, UUID studentId, String student, String description, long amountCents, long feeCents,
             long netCents, PaymentStatus status, Instant paidAt) {}
 
     public record Earnings(String month, long receivedCents, long feeCents, long netCents, Double changePercent,

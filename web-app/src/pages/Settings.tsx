@@ -1,112 +1,70 @@
-import { useState } from 'react';
-
-import { Portrait, type Person } from '../components/Portrait';
-import { Button, Card, ConfirmDialog, fieldStyles, PageHeader } from '../components/ui';
-import { useAdmin } from '../data/store';
+import { Photo } from '../components/Photo';
+import { Card, PageHeader } from '../components/ui';
+import { useApi } from '../data/store';
+import { ago, fullDate, type Settings as SettingsData } from '../data/types';
+import { euros } from '../lib';
 import p from './pages.module.css';
 import s from './Settings.module.css';
 
-const team: { person: Person; name: string; role: string }[] = [
-  { person: 'marta', name: 'Marta Neves', role: 'Administradora' },
-  { person: 'miguel', name: 'Miguel Costa', role: 'Suporte' },
-];
-
 /**
- * Admin · Definições. Not drawn in Figma yet — kept small: platform fees and
- * the team. Changing money values always goes through a confirmation.
+ * Admin · Definições. Money values live in the server's configuration and in Stripe (prices),
+ * so they're shown here, not edited: a change goes through a deploy, never a click.
  */
 export function Settings() {
-  const { notify } = useAdmin();
-  const [saved, setSaved] = useState({ fee: 10, subscription: 4 });
-  const [fee, setFee] = useState('10');
-  const [subscription, setSubscription] = useState('4');
-  const [confirming, setConfirming] = useState(false);
-
-  const nextFee = Number(fee.replace(',', '.'));
-  const nextSub = Number(subscription.replace(',', '.'));
-  const valid = Number.isFinite(nextFee) && nextFee >= 0 && nextFee <= 30 && Number.isFinite(nextSub) && nextSub >= 0 && nextSub <= 50;
-  const dirty = nextFee !== saved.fee || nextSub !== saved.subscription;
+  const { data } = useApi<SettingsData>('/api/v1/admin/settings');
 
   return (
     <>
-      <PageHeader title="Definições" subtitle="Taxas da plataforma e equipa com acesso ao backoffice." />
+      <PageHeader title="Definições" subtitle="Taxas, serviços ligados e equipa com acesso ao backoffice." />
 
       <div className={s.grid}>
         <Card className={s.card}>
-          <h2 className={p.sectionTitle}>Taxas</h2>
-          <label className={fieldStyles.field}>
-            Taxa da Trakio em cada pagamento a um PT
-            <span className={s.suffixed}>
-              <input className={fieldStyles.input} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} />
-              <span>%</span>
-            </span>
-          </label>
-          <label className={fieldStyles.field}>
-            Subscrição mensal do marketplace (por PT)
-            <span className={s.suffixed}>
-              <input className={fieldStyles.input} inputMode="decimal" value={subscription} onChange={(e) => setSubscription(e.target.value)} />
-              <span>€</span>
-            </span>
-          </label>
-          {!valid ? <p className={s.error}>A taxa vai de 0 a 30% e a subscrição de 0 a 50 €.</p> : null}
-          <div className={p.actions}>
-            <Button disabled={!valid || !dirty} onClick={() => setConfirming(true)}>
-              Rever alterações
-            </Button>
-            {dirty ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setFee(String(saved.fee));
-                  setSubscription(String(saved.subscription));
-                }}
-              >
-                Desfazer
-              </Button>
-            ) : null}
-          </div>
+          <h2 className={p.sectionTitle}>Taxas e preços</h2>
+          <Row label="Taxa da Trakio em cada pagamento a um PT" value={data ? `${data.platformFeePercent}%` : '—'} />
+          <Row label="Subscrição mensal do marketplace (por PT)" value={data ? euros(data.marketplacePriceCents / 100) : '—'} />
+          <Row label="Trakio Premium (por mês)" value={data ? euros(data.premiumPriceCents / 100) : '—'} />
+          <p className={`${p.muted} ${p.small}`} style={{ margin: 0 }}>
+            Definidos na configuração do servidor e nos preços do Stripe. Para mudar, altera a configuração e avisa os PTs com 30 dias de
+            antecedência.
+          </p>
+        </Card>
+
+        <Card className={s.card}>
+          <h2 className={p.sectionTitle}>Serviços</h2>
+          <Row
+            label="Pagamentos"
+            value={data ? (data.paymentsProvider === 'stripe' ? 'Stripe' : 'Modo de teste (sem cobranças reais)') : '—'}
+          />
+          <Row label="IA (refeições, prontidão, sugestões)" value={data ? (data.aiEnabled ? 'Ligada' : 'Desligada · alternativas simples') : '—'} />
         </Card>
 
         <Card className={s.card}>
           <h2 className={p.sectionTitle}>Equipa</h2>
-          {team.map((m) => (
-            <div key={m.name} className={s.member}>
-              <Portrait person={m.person} size={36} />
+          {(data?.admins ?? []).map((m) => (
+            <div key={m.id} className={s.member}>
+              <Photo url={null} name={m.email} size={36} />
               <div className={p.twoLine} style={{ flex: 1 }}>
-                <span className={p.strong}>{m.name}</span>
-                <span className={`${p.muted} ${p.small}`}>{m.role}</span>
+                <span className={p.strong}>{m.email}</span>
+                <span className={`${p.muted} ${p.small}`}>
+                  Administrador desde {fullDate(m.since)} · última vez {ago(m.lastSeenAt).toLowerCase()}
+                </span>
               </div>
             </div>
           ))}
-          <Button variant="outline" onClick={() => notify('Os convites para a equipa chegam com o login de administradores.')}>
-            Convidar pessoa
-          </Button>
+          <p className={`${p.muted} ${p.small}`} style={{ margin: 0 }}>
+            Por segurança, contas de administração não se criam no backoffice: o primeiro administrador vem da configuração do servidor.
+          </p>
         </Card>
       </div>
-
-      <ConfirmDialog
-        open={confirming}
-        title="Mudar as taxas?"
-        body="Aplica-se a pagamentos novos a partir de amanhã. Os PTs recebem um email com 30 dias de antecedência."
-        confirmLabel="Confirmar alterações"
-        onClose={() => setConfirming(false)}
-        onConfirm={() => {
-          setSaved({ fee: nextFee, subscription: nextSub });
-          setConfirming(false);
-          notify('Taxas atualizadas.');
-        }}
-      >
-        <div className={s.diff}>
-          <span>Taxa por pagamento</span>
-          <span className="mono">
-            {saved.fee}% → {nextFee}%
-          </span>
-          <span>Subscrição do marketplace</span>
-          <span className="mono">
-            {saved.subscription} € → {nextSub} €
-          </span>
-        </div>
-      </ConfirmDialog>
     </>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={s.member} style={{ justifyContent: 'space-between' }}>
+      <span>{label}</span>
+      <span className="mono">{value}</span>
+    </div>
   );
 }

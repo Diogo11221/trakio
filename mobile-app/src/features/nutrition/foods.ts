@@ -79,6 +79,8 @@ export type FoodItem = {
   grams: number;
   /** Per-gram values so the grams can be edited after parsing. */
   per: { kcal: number; protein: number; carbs: number; fat: number };
+  /** An estimate for a food that isn't in the Trakio table (from the AI): sent with its own values. */
+  custom?: boolean;
 };
 
 export function itemFrom(food: Food, grams: number): FoodItem {

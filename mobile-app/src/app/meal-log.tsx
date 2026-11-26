@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -21,7 +22,9 @@ import { Button } from '@/components/Button';
 import { PressableScale } from '@/components/PressableScale';
 import { IconButton } from '@/components/Surface';
 import { slotForHour, slots, useDiary } from '@/features/nutrition/diary';
-import { parseMeal, totals, type FoodItem } from '@/features/nutrition/foods';
+import { totals, type FoodItem } from '@/features/nutrition/foods';
+import { ApiError, api, filePart, uploadFile } from '@/lib/api';
+import type { EstimateDto } from '@/lib/apiTypes';
 import { formatTimeOfDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { dayKey, newId } from '@/lib/persist';
@@ -36,10 +39,8 @@ type Bubble =
   | { id: string; from: 'ai'; text: string };
 
 /**
- * Cliente · Registar refeição com IA (Premium) — write (or dictate) what you
- * ate; the estimate is editable and nothing is saved without "Confirmar".
- * Recognition runs on a local food table until backend-ai exists, so photos
- * are kept with the meal but not read yet.
+ * Cliente · Registar refeição com IA (Premium) — write, photograph or say what you ate; the
+ * estimate (backend-ai) is editable and nothing is saved without "Confirmar".
  */
 export default function MealLog() {
   const insets = useSafeAreaInsets();
@@ -47,56 +48,65 @@ export default function MealLog() {
   const { addMeal } = useDiary();
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const [bubbles, setBubbles] = useState<Bubble[]>([
-    { id: 'hello', from: 'ai', text: 'Diz-me o que comeste — por exemplo “2 ovos, 150 g de frango, arroz e salada”. Também podes juntar uma foto.' },
+    { id: 'hello', from: 'ai', text: 'Diz-me o que comeste — por exemplo “2 ovos, 150 g de frango, arroz e salada”. Também podes juntar uma foto do prato ou gravar uma mensagem de voz.' },
   ]);
   const [foods, setFoods] = useState<FoodItem[]>([]);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<{ uri: string; fileId: string } | null>(null);
   const [thinking, setThinking] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState('');
-  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => {
-    if (pending.current) clearTimeout(pending.current);
-  }, []);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recording = useAudioRecorderState(recorder).isRecording;
 
   const sum = totals(foods);
   const scrollDown = () => setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 80);
+  const say = (text: string) => {
+    setBubbles((b) => [...b, { id: newId('ai'), from: 'ai', text }]);
+    haptics.tick();
+    scrollDown();
+  };
 
-  /** The "AI" answers after a beat, like a reply. */
-  const reply = (text: string, after: () => void = () => undefined) => {
+  /** Asks backend-ai (or the word reader, if the AI is off) and merges what it found. */
+  const estimate = async (input: { text?: string; photoFileId?: string }) => {
     setThinking(true);
     scrollDown();
-    pending.current = setTimeout(() => {
+    try {
+      const result = await api.post<EstimateDto>('/api/v1/me/meals/ai-estimate', input);
+      const found: FoodItem[] = result.items.map((i) => ({
+        id: i.foodId ?? newId('est'),
+        name: i.name,
+        grams: Math.round(i.grams),
+        per: { kcal: i.per100.kcal / 100, protein: i.per100.protein / 100, carbs: i.per100.carbs / 100, fat: i.per100.fat / 100 },
+        custom: i.foodId === null,
+      }));
+      let merged = foods;
+      for (const item of found) {
+        merged = merged.some((f) => f.id === item.id)
+          ? merged.map((f) => (f.id === item.id ? { ...f, grams: f.grams + item.grams } : f))
+          : [...merged, item];
+      }
+      setFoods(merged);
+      const missing = result.unrecognised.length > 0 ? ` Não reconheci: ${result.unrecognised.join(', ')}.` : '';
+      say(
+        found.length === 0
+          ? (result.note || 'Não reconheci nenhum alimento. Experimenta descrever o prato com palavras simples.') + missing
+          : `Identifiquei ${merged.length} ${merged.length === 1 ? 'alimento' : 'alimentos'}. Confirma as quantidades antes de gravar.${result.note ? ` ${result.note}` : ''}${missing}`,
+      );
+    } catch (e) {
+      say(e instanceof ApiError ? e.message : 'Não consegui analisar agora. Tenta outra vez.');
+    } finally {
       setThinking(false);
-      setBubbles((b) => [...b, { id: newId('ai'), from: 'ai', text }]);
-      after();
-      haptics.tick();
-      scrollDown();
-    }, 900);
+    }
   };
 
   const sendText = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || thinking) return;
     setDraft('');
     haptics.tap();
     setBubbles((b) => [...b, { id: newId('me'), from: 'user', text, photoUri: null, time: formatTimeOfDay(new Date()) }]);
-    const { items, unknown } = parseMeal(text);
-    if (items.length === 0) {
-      reply('Não reconheci nenhum alimento. Experimenta palavras simples como “frango”, “arroz”, “pão” ou “iogurte”.');
-      return;
-    }
-    let merged = foods;
-    for (const item of items) {
-      merged = merged.some((f) => f.id === item.id)
-        ? merged.map((f) => (f.id === item.id ? { ...f, grams: f.grams + item.grams } : f))
-        : [...merged, item];
-    }
-    const extra = unknown.length > 0 ? ` Não reconheci: ${unknown.join(', ')}.` : '';
-    reply(`Identifiquei ${merged.length} ${merged.length === 1 ? 'alimento' : 'alimentos'}. Confirma as quantidades antes de gravar.${extra}`, () =>
-      setFoods(merged),
-    );
+    estimate({ text });
   };
 
   const attachPhoto = async (source: 'camera' | 'library') => {
@@ -108,13 +118,18 @@ export default function MealLog() {
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     const uri = result.canceled ? null : (result.assets[0]?.uri ?? null);
     if (!uri) return;
-    setPhotoUri(uri);
     setBubbles((b) => [...b, { id: newId('me'), from: 'user', text: null, photoUri: uri, time: formatTimeOfDay(new Date()) }]);
-    reply(
-      foods.length > 0
-        ? 'Juntei a foto a esta refeição.'
-        : 'Guardo a foto com a refeição. Nesta versão ainda não leio fotos — escreve o que está no prato e eu faço as contas.',
-    );
+    setThinking(true);
+    try {
+      const type = uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+      const file = await uploadFile(uri, 'meal', type === 'image/png' ? 'refeicao.png' : 'refeicao.jpg', type);
+      setPhoto({ uri, fileId: file.id });
+      setThinking(false);
+      await estimate({ photoFileId: file.id });
+    } catch (e) {
+      setThinking(false);
+      say(e instanceof ApiError ? e.message : 'Não consegui enviar a foto. Tenta outra vez.');
+    }
   };
 
   const pickPhoto = () =>
@@ -124,26 +139,62 @@ export default function MealLog() {
       { text: 'Cancelar', style: 'cancel' },
     ]);
 
-  const voice = () =>
-    Alert.alert('Registo por voz', 'Chega com o servidor de IA. Por agora, usa o microfone do teclado para ditar a refeição.');
+  /** Tap to start recording, tap again to stop: the server writes it down, then estimates. */
+  const voice = async () => {
+    if (thinking) return;
+    if (!recording) {
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Sem acesso ao microfone', 'Autoriza o microfone nas definições para registares refeições por voz.');
+        return;
+      }
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      haptics.tap();
+      return;
+    }
+    await recorder.stop();
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+    const uri = recorder.uri;
+    if (!uri) return;
+    setThinking(true);
+    try {
+      const form = new FormData();
+      form.append('audio', filePart(uri, 'refeicao.m4a', 'audio/mp4'));
+      const { text } = await api.upload<{ text: string }>('/api/v1/me/meals/transcribe', form);
+      setThinking(false);
+      setBubbles((b) => [...b, { id: newId('me'), from: 'user', text, photoUri: null, time: formatTimeOfDay(new Date()) }]);
+      await estimate({ text });
+    } catch (e) {
+      setThinking(false);
+      say(e instanceof ApiError ? e.message : 'Não consegui perceber a gravação. Escreve a refeição.');
+    }
+  };
 
   const setGrams = (id: string, delta: number) =>
     setFoods((list) => list.map((f) => (f.id === id ? { ...f, grams: Math.max(0, f.grams + delta * GRAM_STEP) } : f)));
 
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     const now = new Date();
     const day = params.day ?? dayKey(now);
-    const slot = slotForHour(now.getHours());
-    addMeal(day, {
-      id: newId('meal'),
-      slot,
-      time: formatTimeOfDay(now),
-      items: foods.filter((f) => f.grams > 0),
-      source: 'ai',
-      photoUri,
-    });
-    haptics.success();
-    router.back();
+    setSaving(true);
+    try {
+      await addMeal(day, {
+        slot: slotForHour(now.getHours()),
+        time: formatTimeOfDay(now),
+        items: foods.filter((f) => f.grams > 0),
+        source: 'ai',
+        photoUri: photo?.uri ?? null,
+        photoFileId: photo?.fileId,
+      });
+      haptics.success();
+      router.back();
+    } catch (e) {
+      setSaving(false);
+      Alert.alert('Não foi possível gravar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+    }
   };
 
   const slotName = slots.find((s) => s.id === slotForHour(new Date().getHours()))?.name ?? 'Refeição';
@@ -185,6 +236,17 @@ export default function MealLog() {
             </Animated.View>
           ),
         )}
+
+        {recording ? (
+          <View style={styles.aiMessage}>
+            <View style={styles.aiAvatar}>
+              <View style={styles.aiAvatarDot} />
+            </View>
+            <AppText variant="label" style={[styles.aiText, styles.flex]}>
+              A gravar… diz o que comeste e toca outra vez no microfone para terminar.
+            </AppText>
+          </View>
+        ) : null}
 
         {thinking ? (
           <View style={styles.aiMessage}>
@@ -262,7 +324,7 @@ export default function MealLog() {
                 <AppText style={styles.editText}>{editing ? 'Pronto' : 'Editar'}</AppText>
               </PressableScale>
               <View style={styles.flex}>
-                <Button label="Confirmar e gravar" height={46} style={styles.confirm} onPress={save} haptic={null} />
+                <Button label={saving ? 'A gravar…' : 'Confirmar e gravar'} height={46} style={styles.confirm} onPress={save} haptic={null} disabled={saving} />
               </View>
             </View>
           </Animated.View>
@@ -284,7 +346,13 @@ export default function MealLog() {
             accessibilityLabel="O que comeste?"
           />
           <IconButton icon="camera" size={34} iconSize={18} onPress={pickPhoto} accessibilityLabel="Juntar foto" />
-          <IconButton icon="mic" size={34} iconSize={16} onPress={voice} accessibilityLabel="Gravar áudio" />
+          <IconButton
+            icon="mic"
+            size={34}
+            iconSize={16}
+            onPress={() => voice().catch(() => Alert.alert('Não foi possível gravar', 'Tenta outra vez.'))}
+            accessibilityLabel={recording ? 'Parar gravação' : 'Gravar áudio'}
+          />
         </View>
       </View>
     </KeyboardAvoidingView>

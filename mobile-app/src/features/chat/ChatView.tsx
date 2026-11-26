@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,8 +11,9 @@ import { PressableScale } from '@/components/PressableScale';
 import { IconButton } from '@/components/Surface';
 import { AttachSheet, type AttachSource, type Attachment } from '@/features/pt/AttachSheet';
 import type { ChatMessage } from '@/features/pt/data';
-import { formatTimeOfDay } from '@/lib/format';
+import { ApiError, protectedImage } from '@/lib/api';
 import { haptics } from '@/lib/haptics';
+import { openAttachment, type Outgoing } from '@/state/chat';
 import { enterRise } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
 
@@ -24,12 +25,14 @@ export type ChatViewProps = {
   name: string;
   subtitle: string;
   onOpenProfile?: () => void;
-  onSend: (message: ChatMessage) => void;
+  onSend: (message: Outgoing) => Promise<void>;
   attach: AttachSource[];
+  /** False once the coaching ended: the thread stays readable. */
+  canSend?: boolean;
 };
 
 /** A conversation between a PT and a student, from either side. */
-export function ChatView({ messages, mine, avatar, name, subtitle, onOpenProfile, onSend, attach }: ChatViewProps) {
+export function ChatView({ messages, mine, avatar, name, subtitle, onOpenProfile, onSend, attach, canSend: open = true }: ChatViewProps) {
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState('');
   const [attachOpen, setAttachOpen] = useState(false);
@@ -37,27 +40,26 @@ export function ChatView({ messages, mine, avatar, name, subtitle, onOpenProfile
   // Messages that were already on screen don't animate in; new ones do.
   const [initialCount] = useState(messages.length);
 
-  const send = (message: ChatMessage) => {
+  const send = async (message: Outgoing, restore?: string) => {
     haptics.tap();
-    onSend(message);
-    setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 60);
+    try {
+      await onSend(message);
+      setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 60);
+    } catch (e) {
+      if (restore) setDraft(restore);
+      haptics.warning();
+      Alert.alert('Mensagem não enviada', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+    }
   };
 
   const sendText = () => {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
-    const now = new Date();
-    send({ id: `m-${now.getTime()}`, from: mine, kind: 'text', text, time: formatTimeOfDay(now) });
+    send({ kind: 'text', text }, text);
   };
 
-  const sendAttachment = (attachment: Attachment) => {
-    const now = new Date();
-    const base = { id: `m-${now.getTime()}`, time: formatTimeOfDay(now) };
-    if (attachment.kind === 'photo') send({ ...base, from: mine, kind: 'photo', uri: attachment.uri });
-    else if (attachment.kind === 'file') send({ ...base, from: mine, kind: 'file', name: attachment.name, meta: attachment.meta });
-    else send({ ...base, from: 'system', kind: 'workout', title: attachment.title, detail: attachment.detail });
-  };
+  const sendAttachment = (attachment: Attachment) => send(attachment);
 
   const canSend = draft.trim().length > 0;
   const sendStyle = useAnimatedStyle(() => ({
@@ -116,6 +118,11 @@ export function ChatView({ messages, mine, avatar, name, subtitle, onOpenProfile
       </ScrollView>
 
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        {!open ? (
+          <AppText variant="small" tone="muted" style={styles.empty}>
+            O acompanhamento terminou. Podes reler a conversa, mas já não enviar mensagens.
+          </AppText>
+        ) : (
         <View style={styles.input}>
           <IconButton icon="plus" size={36} iconSize={16} onPress={() => setAttachOpen(true)} accessibilityLabel="Anexar" />
           <TextInput
@@ -142,6 +149,7 @@ export function ChatView({ messages, mine, avatar, name, subtitle, onOpenProfile
             </Animated.View>
           </PressableScale>
         </View>
+        )}
       </View>
 
       <AttachSheet visible={attachOpen} onClose={() => setAttachOpen(false)} onAttach={sendAttachment} sources={attach} />
@@ -175,7 +183,7 @@ function Message({ message, other, mine }: { message: ChatMessage; other: string
       ) : message.kind === 'photo' ? (
         <View style={[styles.photoBubble, mine ? styles.bubbleMineShape : styles.bubbleTheirsShape]}>
           <Image
-            source={message.uri ? { uri: message.uri } : require('@/assets/figma/photo-lunch.jpg')}
+            source={message.uri ? protectedImage(message.uri) : require('@/assets/figma/photo-lunch.jpg')}
             style={styles.photo}
             contentFit="cover"
             accessibilityLabel={mine ? 'Foto enviada' : `Foto de ${other}`}
@@ -183,7 +191,11 @@ function Message({ message, other, mine }: { message: ChatMessage; other: string
           {message.caption ? <AppText style={styles.caption}>{message.caption}</AppText> : null}
         </View>
       ) : (
-        <View style={[styles.file, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+        <PressableScale
+          onPress={() => (message.url ? openAttachment(message.url).catch(() => Alert.alert('Não foi possível abrir o ficheiro')) : undefined)}
+          style={[styles.file, mine ? styles.bubbleMine : styles.bubbleTheirs]}
+          accessibilityLabel={`Abrir ${message.name}`}
+        >
           <View style={styles.fileIcon}>
             <Icon name="file" size={20} tint={mine ? undefined : colors.text} />
           </View>
@@ -191,7 +203,7 @@ function Message({ message, other, mine }: { message: ChatMessage; other: string
             <AppText style={[styles.fileName, !mine && { color: colors.text }]}>{message.name}</AppText>
             <AppText style={[styles.fileMeta, !mine && { color: colors.textMuted }]}>{message.meta} · toca para abrir</AppText>
           </View>
-        </View>
+        </PressableScale>
       )}
       <AppText style={styles.time}>{message.time}</AppText>
     </View>

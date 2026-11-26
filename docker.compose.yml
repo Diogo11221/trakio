@@ -1,4 +1,4 @@
-# Local stack: PostgreSQL + backend-core.
+# Local stack: PostgreSQL + backend-ai (internal) + backend-core.
 #   cp .env.example .env && docker compose -f docker.compose.yml up --build
 # API on http://localhost:8080 (health: /actuator/health).
 name: trakio
@@ -22,19 +22,39 @@ services:
       timeout: 3s
       retries: 10
 
+  # Internal only: no published port, reached by backend-core with the shared token.
+  backend-ai:
+    build:
+      context: ./backend-ai
+      args:
+        VOICE: ${TRAKIO_AI_VOICE:-0}
+    restart: unless-stopped
+    environment:
+      TRAKIO_AI_TOKEN: ${TRAKIO_AI_TOKEN:?set TRAKIO_AI_TOKEN in .env}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
   backend-core:
     build: ./backend-core
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      backend-ai:
+        condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       TRAKIO_DB_URL: jdbc:postgresql://db:5432/trakio
       TRAKIO_DB_USER: trakio
       TRAKIO_DB_PASSWORD: ${POSTGRES_PASSWORD}
       TRAKIO_JWT_SECRET: ${TRAKIO_JWT_SECRET:-}
-      TRAKIO_CORS_ORIGINS: ${TRAKIO_CORS_ORIGINS:-http://localhost:5173}
+      TRAKIO_CORS_ORIGINS: ${TRAKIO_CORS_ORIGINS:-http://localhost:5174}
+      TRAKIO_AI_URL: http://backend-ai:8000
+      TRAKIO_AI_TOKEN: ${TRAKIO_AI_TOKEN}
       TRAKIO_BOOTSTRAP_ADMIN_EMAIL: ${TRAKIO_BOOTSTRAP_ADMIN_EMAIL:-}
       TRAKIO_BOOTSTRAP_ADMIN_PASSWORD: ${TRAKIO_BOOTSTRAP_ADMIN_PASSWORD:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}

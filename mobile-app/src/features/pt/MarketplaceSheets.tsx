@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Checkbox } from '@/components/Checkbox';
 import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
+import { ApiError } from '@/lib/api';
 import { haptics } from '@/lib/haptics';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -17,7 +18,7 @@ export function ActivateMarketplaceSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  onActivated: () => void;
+  onActivated: () => Promise<void>;
 }) {
   const [paying, setPaying] = useState(false);
 
@@ -39,7 +40,7 @@ export function ActivateMarketplaceSheet({
         <View style={styles.flex}>
           <AppText style={styles.priceTitle}>Subscrição mensal</AppText>
           <AppText variant="caption" tone="muted">
-            Cobrada hoje e depois a cada dia 1
+            Cobrada hoje e depois todos os meses neste dia
           </AppText>
         </View>
         <AppText style={styles.amount}>4,00 €</AppText>
@@ -47,14 +48,11 @@ export function ActivateMarketplaceSheet({
       <View style={styles.card}>
         <Icon name="card" size={22} />
         <View style={styles.flex}>
-          <AppText variant="label">Cartão terminado em 4242</AppText>
+          <AppText variant="label">Pagamento com cartão</AppText>
           <AppText variant="caption" tone="muted">
             Pagamento seguro via Stripe
           </AppText>
         </View>
-        <AppText variant="small" tone="muted" style={styles.medium}>
-          Alterar
-        </AppText>
       </View>
       {paying ? (
         <View style={styles.paying}>
@@ -64,14 +62,16 @@ export function ActivateMarketplaceSheet({
         <Button
           label="Confirmar e pagar 4 €/mês"
           height={54}
-          onPress={() => {
+          onPress={async () => {
             setPaying(true);
-            // Stripe Billing isn't wired yet — simulate the round-trip.
-            setTimeout(() => {
-              setPaying(false);
+            try {
+              await onActivated();
               haptics.success();
-              onActivated();
-            }, 900);
+            } catch (e) {
+              Alert.alert('Não foi possível ativar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+            } finally {
+              setPaying(false);
+            }
           }}
         />
       )}
@@ -86,15 +86,19 @@ export function ActivateMarketplaceSheet({
 export function CancelMarketplaceSheet({
   visible,
   students,
+  until,
   onClose,
   onCancelled,
 }: {
   visible: boolean;
   students: number;
+  /** "1 de dezembro" — when the paid month ends. */
+  until: string;
   onClose: () => void;
-  onCancelled: () => void;
+  onCancelled: () => Promise<void>;
 }) {
   const [understood, setUnderstood] = useState(false);
+  const [busy, setBusy] = useState(false);
   const consequences = [
     { text: 'Novos alunos deixam de te encontrar', keeps: false },
     { text: `Os teus ${students} alunos continuam contigo`, keeps: true },
@@ -115,7 +119,7 @@ export function CancelMarketplaceSheet({
         <View style={styles.head}>
           <AppText variant="heading">Cancelar a subscrição?</AppText>
           <AppText variant="label" tone="muted" style={styles.body}>
-            Deixas de aparecer no marketplace a partir de 1 de dezembro.
+            Deixas de aparecer no marketplace a partir de {until}.
           </AppText>
         </View>
       }
@@ -140,11 +144,18 @@ export function CancelMarketplaceSheet({
         label="Cancelar subscrição"
         variant="outline"
         height={54}
-        disabled={!understood}
-        onPress={() => {
-          haptics.warning();
-          setUnderstood(false);
-          onCancelled();
+        disabled={!understood || busy}
+        onPress={async () => {
+          setBusy(true);
+          try {
+            await onCancelled();
+            haptics.warning();
+            setUnderstood(false);
+          } catch (e) {
+            Alert.alert('Não foi possível cancelar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+          } finally {
+            setBusy(false);
+          }
         }}
       />
       <AppText variant="caption" tone="muted" style={styles.center}>

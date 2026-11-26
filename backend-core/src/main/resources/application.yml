@@ -28,6 +28,9 @@ spring:
       max-request-size: 11MB
   jackson:
     default-property-inclusion: always
+    deserialization:
+      # A missing boolean/number in a request means false/0 (required numbers are still checked by @Min).
+      fail-on-null-for-primitives: false
   mvc:
     problemdetails:
       enabled: true
@@ -64,7 +67,7 @@ trakio:
     access-token-ttl: 15m
     refresh-token-ttl: 30d
   cors:
-    allowed-origins: ${TRAKIO_CORS_ORIGINS:http://localhost:5173,http://localhost:8081}
+    allowed-origins: ${TRAKIO_CORS_ORIGINS:http://localhost:5174,http://localhost:8081}
   storage:
     local-dir: ${TRAKIO_STORAGE_DIR:./data/uploads}
     max-file-bytes: 10485760
@@ -87,6 +90,10 @@ trakio:
     general-per-minute: 300
     max-failed-logins: 5
     lockout: 15m
+  ai:
+    base-url: ${TRAKIO_AI_URL:}
+    token: ${TRAKIO_AI_TOKEN:}
+    timeout: 20s
   bootstrap-admin:
     email: ${TRAKIO_BOOTSTRAP_ADMIN_EMAIL:}
     password: ${TRAKIO_BOOTSTRAP_ADMIN_PASSWORD:}

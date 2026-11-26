@@ -5,16 +5,15 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { Card, CardRow } from '@/components/Surface';
 import { AccountSheet } from '@/features/pt/AccountSheet';
 import { SectionHeader, StatStrip } from '@/features/pt/components';
-import { agenda, months, students } from '@/features/pt/data';
+import { AppointmentSheet } from '@/features/pt/AppointmentSheet';
 import { useTrainer } from '@/features/pt/store';
-import { formatToday, greeting } from '@/lib/format';
-import { refreshMockData } from '@/lib/refresh';
+import { formatTimeOfDay, formatToday, greeting } from '@/lib/format';
+import { refreshAll } from '@/lib/refresh';
 import { firstName, useTrainerProfile } from '@/state/auth';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -22,14 +21,16 @@ import { colors, fonts } from '@/theme/tokens';
 export default function TrainerHome() {
   const now = new Date();
   const profile = useTrainerProfile();
-  const { aiDecisions } = useTrainer();
+  const { students, agenda, thisMonth } = useTrainer();
   const [accountOpen, setAccountOpen] = useState(false);
-  // Once the trainer acts on an AI suggestion, the student leaves this list.
-  const attention = students.filter((s) => s.tag === 'attention' && !aiDecisions[s.id]);
+  const [booking, setBooking] = useState(false);
+  // Students with an open AI suggestion; acting on it removes them from this list.
+  const attention = students.filter((s) => s.tag === 'attention');
+  const today = agenda.filter((a) => new Date(a.startsAt).toDateString() === now.toDateString());
 
   return (
     <>
-      <Screen gap={16} onRefresh={refreshMockData}>
+      <Screen gap={16} onRefresh={refreshAll}>
         <Reveal index={0} style={styles.header}>
           <View style={styles.headerText}>
             <AppText variant="small" tone="muted">
@@ -40,7 +41,7 @@ export default function TrainerHome() {
             </AppText>
           </View>
           <PressableScale onPress={() => setAccountOpen(true)} accessibilityLabel="Conta">
-            <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={42} name={profile.name} />
+            <Avatar photoUri={profile.photoUri} size={42} name={profile.name} />
           </PressableScale>
         </Reveal>
 
@@ -49,7 +50,7 @@ export default function TrainerHome() {
             stats={[
               { value: String(students.length), label: 'alunos ativos' },
               { value: String(attention.length), label: 'com alertas', dot: attention.length > 0 },
-              { value: `${months[0].received}€`, label: 'este mês' },
+              { value: `${Math.round((thisMonth?.netCents ?? 0) / 100)}€`, label: 'este mês' },
             ]}
           />
         </Reveal>
@@ -80,7 +81,7 @@ export default function TrainerHome() {
                   accessibilityLabel={`${student.name}: ${student.alert}`}
                 >
                   <CardRow last={i === attention.length - 1} style={styles.row}>
-                    <Portrait person={student.id} size={40} />
+                    <Avatar photoUri={student.photoUri} size={40} name={student.name} />
                     <View style={styles.flex}>
                       <AppText style={styles.name}>{student.name}</AppText>
                       <AppText variant="caption" tone="muted" numberOfLines={1}>
@@ -96,38 +97,43 @@ export default function TrainerHome() {
         </Reveal>
 
         <Reveal index={4}>
-          <SectionHeader title="Hoje" />
+          <SectionHeader title="Hoje" action="Marcar sessão" onAction={() => setBooking(true)} />
         </Reveal>
 
         <Reveal index={5}>
           <Card>
-            {agenda.map((item, i) => (
-              <CardRow key={item.id} last={i === agenda.length - 1} style={styles.agendaRow}>
-                <AppText style={styles.time}>{item.time}</AppText>
+            {today.length === 0 ? (
+              <View style={styles.empty}>
+                <AppText variant="small" tone="muted">
+                  Sem sessões marcadas para hoje.
+                </AppText>
+              </View>
+            ) : null}
+            {today.map((item, i) => (
+              <CardRow key={item.id} last={i === today.length - 1} style={styles.agendaRow}>
+                <AppText style={styles.time}>{formatTimeOfDay(new Date(item.startsAt))}</AppText>
                 <View style={styles.flex}>
-                  <AppText variant="label">{item.title}</AppText>
+                  <AppText variant="label">
+                    {item.title}
+                    {item.with ? ` · ${item.with.name}` : ''}
+                  </AppText>
                   <AppText variant="caption" tone="muted">
-                    {item.detail}
+                    {item.online ? 'Videochamada' : item.place || 'Presencial'} · {item.durationMinutes} min
                   </AppText>
                 </View>
-                {item.live ? (
+                {item.online && item.with ? (
                   <PressableScale
                     haptic="press"
-                    onPress={() =>
-                      Alert.alert(
-                        'Videochamada',
-                        'As videochamadas chegam com o backend. Por agora, combina a chamada pelo chat.',
-                        [
-                          { text: 'Fechar', style: 'cancel' },
-                          { text: 'Abrir conversa', onPress: () => item.student && router.push({ pathname: '/pt/chat/[id]', params: { id: item.student } }) },
-                        ],
-                      )
-                    }
+                    onPress={() => {
+                      const student = students.find((s) => s.id === item.with?.id);
+                      if (student?.conversationId) router.push({ pathname: '/pt/chat/[id]', params: { id: student.conversationId } });
+                      else Alert.alert('Videochamada', 'Combina a ligação de vídeo com o aluno pelo chat.');
+                    }}
                     style={styles.join}
                     accessibilityRole="button"
-                    accessibilityLabel="Entrar na videochamada"
+                    accessibilityLabel="Combinar a videochamada no chat"
                   >
-                    <AppText style={styles.joinText}>Entrar</AppText>
+                    <AppText style={styles.joinText}>Chat</AppText>
                   </PressableScale>
                 ) : (
                   <Icon name="chevronRightFaint" size={14} />
@@ -162,6 +168,7 @@ export default function TrainerHome() {
           </PressableScale>
         </Reveal>
       </Screen>
+      <AppointmentSheet visible={booking} onClose={() => setBooking(false)} />
       <AccountSheet visible={accountOpen} onClose={() => setAccountOpen(false)} />
     </>
   );

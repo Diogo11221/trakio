@@ -46,9 +46,13 @@ export const emptyClient: ClientDraft = {
 export const emptyTrainer: TrainerDraft = {
   name: '',
   photoUri: null,
+  article: 'o',
   city: '',
+  area: '',
   online: false,
+  bio: '',
   specialties: [],
+  verified: false,
 };
 
 // ── Validation ──────────────────────────────────────────────────────────────

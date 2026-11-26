@@ -110,12 +110,27 @@ public class VerificationService {
 
     @Transactional(readOnly = true)
     public List<QueueItem> queue() {
-        return requests.findByStatusInOrderBySubmittedAtAsc(QUEUE).stream().map(r -> {
+        return list(QUEUE);
+    }
+
+    /** "pending" (to review), "approved" or "refused". */
+    @Transactional(readOnly = true)
+    public List<QueueItem> list(String filter) {
+        return switch (filter == null ? "pending" : filter) {
+            case "approved" -> list(List.of(VerificationStatus.APPROVED));
+            case "refused" -> list(List.of(VerificationStatus.REFUSED));
+            default -> list(QUEUE);
+        };
+    }
+
+    private List<QueueItem> list(List<VerificationStatus> statuses) {
+        return requests.findByStatusInOrderBySubmittedAtAsc(statuses).stream().map(r -> {
             TrainerProfile t = trainers.findByUserId(r.getTrainerId()).orElse(null);
             long pending = r.getDocuments().stream().filter(d -> d.getStatus() != DocumentStatus.CONFIRMED).count();
             boolean payoutsReady = t != null && t.isPayoutsEnabled();
-            return new QueueItem(r.getId(), r.getTrainerId(), t == null ? "—" : t.getName(), t == null ? "" : t.getCity(),
-                    t == null ? List.of() : List.copyOf(t.getSpecialties()), r.getStatus(), r.getSubmittedAt(),
+            return new QueueItem(r.getId(), r.getTrainerId(), t == null ? "—" : t.getName(),
+                    t == null ? null : FileService.url(t.getPhotoFileId()), t == null ? "" : t.getCity(),
+                    t == null ? List.of() : List.copyOf(t.getSpecialties()), r.getStatus(), r.getSubmittedAt(), r.getDecidedAt(),
                     pending == 0 && payoutsReady && r.getDocuments().size() == DocumentType.values().length, pending);
         }).toList();
     }
@@ -129,7 +144,7 @@ public class VerificationService {
         VerificationRequest r = requests.findById(requestId).orElseThrow(() -> ApiException.notFound("Este pedido"));
         TrainerProfile t = trainers.findByUserId(r.getTrainerId()).orElseThrow(() -> ApiException.notFound("Este PT"));
         String email = users.findById(r.getTrainerId()).map(u -> u.getEmail()).orElse("");
-        return new AdminDetail(r.getId(), r.getTrainerId(), t.getName(), email, t.getCity(), t.where(),
+        return new AdminDetail(r.getId(), r.getTrainerId(), t.getName(), FileService.url(t.getPhotoFileId()), email, t.getCity(), t.where(),
                 List.copyOf(t.getSpecialties()), t.getBio(),
                 packages.findByTrainerIdAndActiveTrueOrderByPosition(r.getTrainerId()).stream().map(PackageView::of).toList(),
                 r.getStatus(), r.getAdminNote(), r.getSubmittedAt(), documents(r),

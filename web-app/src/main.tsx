@@ -11,7 +11,8 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 
 import { Layout } from './components/Layout';
-import { AdminProvider } from './data/store';
+import { AdminProvider, useAdmin } from './data/store';
+import { Login } from './pages/Login';
 import { Library } from './pages/Library';
 import { Overview } from './pages/Overview';
 import { Payments } from './pages/Payments';
@@ -39,10 +40,18 @@ const router = createBrowserRouter([
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element #root not found');
 
+/** Nothing of the back office renders without an admin session. */
+function Gate() {
+  const { session } = useAdmin();
+  if (session.status === 'loading') return null;
+  if (session.status === 'signedOut') return <Login />;
+  return <RouterProvider router={router} />;
+}
+
 createRoot(container).render(
   <StrictMode>
     <AdminProvider>
-      <RouterProvider router={router} />
+      <Gate />
     </AdminProvider>
   </StrictMode>,
 );

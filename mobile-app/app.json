@@ -36,7 +36,12 @@
         }
       ],
       "expo-font",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O Trakio usa o microfone para registares refeições por voz."
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -50,7 +55,8 @@
           "photosPermission": "O Trakio usa as tuas fotografias para as enviares ao teu PT ou aluno.",
           "cameraPermission": "O Trakio usa a câmara para fotografares refeições e enviares fotos ao teu PT ou aluno."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

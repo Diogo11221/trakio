@@ -32,6 +32,10 @@ class DevSeedTest extends IntegrationTest {
 
         Session admin = signIn("admin@trakio.test", "trakio123");
         assertThat(call(get("/api/v1/admin/verifications"), admin, null, 200).findValuesAsString("name")).contains("Inês Almeida");
-        assertThat(call(get("/api/v1/admin/overview"), admin, null, 200).get("revenueCents").asLong()).isPositive();
+        JsonNode overview = call(get("/api/v1/admin/overview"), admin, null, 200);
+        assertThat(overview.get("revenueCents").asLong()).isPositive();
+        assertThat(overview.get("openReports").asLong()).isEqualTo(1);
+        assertThat(overview.get("refundRequests").asLong()).isEqualTo(1);
+        assertThat(call(get("/api/v1/admin/reports"), admin, null, 200).get(0).at("/signals/authorTrainedWithTrainer").asBoolean()).isFalse();
     }
 }

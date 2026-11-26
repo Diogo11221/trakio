@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -8,17 +9,23 @@ import { PressableScale } from '@/components/PressableScale';
 import { Sheet } from '@/components/Sheet';
 import { useTrainer } from '@/features/pt/store';
 import { useAuth, useTrainerProfile } from '@/state/auth';
-import { useSettings } from '@/state/settings';
+import { DeleteAccountSheet } from '@/features/auth/DeleteAccountSheet';
 import { colors, fonts } from '@/theme/tokens';
 
 /** Trainer account (from the avatar on Início): verification, subscription, switch to student mode, sign out. */
 export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { steps, verificationSent, marketplaceActive } = useTrainer();
-  const { setMode } = useSettings();
+  const { verification, marketplaceActive } = useTrainer();
   const { signOut: endSession } = useAuth();
   const profile = useTrainerProfile();
+  const [deleting, setDeleting] = useState(false);
   const where = [profile.city, profile.online ? 'Online' : ''].filter(Boolean).join(' + ');
-  const done = steps.filter((s) => s.done).length;
+  const verificationLabel: Record<string, string> = {
+    draft: 'Por enviar',
+    submitted: 'Em análise',
+    'info-requested': 'Falta informação',
+    approved: 'Verificado',
+    refused: 'Recusado',
+  };
 
   const go = (action: () => void) => {
     onClose();
@@ -46,7 +53,7 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
       accessibilityLabel="Conta"
       header={
         <View style={styles.header}>
-          <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={48} name={profile.name} />
+          <Avatar photoUri={profile.photoUri} size={48} name={profile.name} />
           <View style={styles.flex}>
             <AppText variant="heading">{profile.name}</AppText>
             <AppText variant="small" tone="muted">
@@ -60,7 +67,7 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
         <Row label="Editar perfil" onPress={() => go(() => router.push('/edit-profile'))} />
         <Row
           label="Verificar perfil"
-          value={verificationSent ? 'Em análise' : `${done} de ${steps.length}`}
+          value={verificationLabel[verification?.status ?? 'draft']}
           onPress={() => go(() => router.push('/pt/verify'))}
         />
         <Row
@@ -68,22 +75,14 @@ export function AccountSheet({ visible, onClose }: { visible: boolean; onClose: 
           value={marketplaceActive ? 'Ativa' : 'Inativa'}
           onPress={() => go(() => router.navigate('/pt/earnings'))}
         />
-        <Row
-          label="Mudar para modo aluno"
-          onPress={() =>
-            go(() => {
-              setMode('coached');
-              router.replace('/today');
-            })
-          }
-          last
-        />
+        <Row label="Apagar conta" onPress={() => go(() => setDeleting(true))} last />
       </View>
       <PressableScale onPress={signOut} style={styles.signOut} accessibilityRole="button">
         <AppText variant="label" tone="muted">
           Terminar sessão
         </AppText>
       </PressableScale>
+      <DeleteAccountSheet visible={deleting} onClose={() => setDeleting(false)} />
     </Sheet>
   );
 }

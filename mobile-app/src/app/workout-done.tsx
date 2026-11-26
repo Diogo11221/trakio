@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -17,7 +17,8 @@ import { Icon } from '@/components/Icon';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Screen';
 import { Card } from '@/components/Surface';
-import { recordsIn, sessionFromWorkout, useHistory } from '@/features/workout/history';
+import { recordsIn, sessionFromWorkout, useHistory, type Session } from '@/features/workout/history';
+import { usePlan } from '@/features/workout/plan';
 import { useWorkout, workoutSummary, type WorkoutState } from '@/features/workout/store';
 import { decimal } from '@/features/tools/calc';
 import { useChat } from '@/state/chat';
@@ -38,6 +39,7 @@ export default function WorkoutDone() {
   const insets = useSafeAreaInsets();
   const { state, setFeeling, reset } = useWorkout();
   const { sessions, addSession } = useHistory();
+  const { planId } = usePlan();
   const { sendToTrainer, trainerName } = useChat();
   const summary = workoutSummary(state);
   const draft = sessionFromWorkout(state.plan, state.startedAt ?? 0, state.finishedAt ?? 0, state.feeling);
@@ -61,39 +63,31 @@ export default function WorkoutDone() {
     opacity: tick.get(),
   }));
 
-  const save = () => {
-    // Nothing logged (e.g. "Terminar treino" right away) → nothing to keep.
-    return draft.sets > 0 ? addSession(draft) : null;
-  };
+  const [saving, setSaving] = useState(false);
 
-  const close = () => {
-    save();
-    reset();
-    router.dismissTo('/today');
-  };
+  /** Saves on the server (records and volume are worked out there). Nothing logged → nothing to keep. */
+  const save = async (): Promise<Session | null> => (draft.sets > 0 ? addSession(draft, planId) : null);
 
-  const sendSummary = () => {
-    const saved = save();
-    if (saved) {
-      const feeling = feelings.find((f) => f.value === saved.feeling)?.label;
-      sendToTrainer({
-        kind: 'workout',
-        title: `${saved.title} · ${saved.focus} concluído`,
-        detail: [
-          `${summary.minutes || 1} min`,
-          `${saved.sets} séries`,
-          `${formatThousands(saved.volume)} kg`,
-          saved.records.length > 0 ? `recorde: ${saved.records.join(', ')}` : null,
-          feeling ? `senti: ${feeling.toLowerCase()}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-      });
-      haptics.success();
+  const finish = async (share: boolean) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const saved = await save();
+      if (share && saved) {
+        await sendToTrainer({ kind: 'workout', sessionId: saved.id });
+        haptics.success();
+      }
+      reset();
+      router.dismissTo('/today');
+    } catch {
+      // The workout stays on this phone; trying again can't save it twice.
+      setSaving(false);
+      Alert.alert('Não foi possível guardar o treino', 'Verifica a ligação e tenta outra vez. O treino continua guardado no telemóvel.');
     }
-    reset();
-    router.dismissTo('/today');
   };
+
+  const close = () => finish(false);
+  const sendSummary = () => finish(true);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 96, paddingBottom: insets.bottom + 10 }]}>

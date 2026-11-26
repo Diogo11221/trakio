@@ -125,7 +125,25 @@ public class AdminService {
                 revenue, previous == 0 ? null : Math.round((revenue - previous) * 1000.0 / previous) / 10.0,
                 payments.sumProcessed(PaymentRepository.COUNTED, from, to), byMonth,
                 meals.countBySourceAndCreatedAtAfter(MealSource.AI, from),
-                verification.pendingCount(), moderation.openCount());
+                verification.pendingCount(), moderation.openCount(),
+                payments.search(PaymentStatus.REFUND_REQUESTED, null, Pages.of(0, 1, Sort.unsorted())).getTotalElements(),
+                payments.search(PaymentStatus.DISPUTED, null, Pages.of(0, 1, Sort.unsorted())).getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public AdminDtos.Settings settings() {
+        var p = properties.payments();
+        var admins = users.adminSearch(null, Role.ADMIN, null, Pages.of(0, 50, Sort.unsorted())).getContent().stream()
+                .map(u -> new AdminDtos.TeamMember(u.getId(), u.getEmail(), u.getCreatedAt(), u.getLastSeenAt())).toList();
+        return new AdminDtos.Settings(p.platformFeePercent(), p.premiumPriceCents(), p.marketplacePriceCents(), p.provider(),
+                properties.ai().enabled(), admins);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminDtos.Totals totals() {
+        return new AdminDtos.Totals(users.count(), users.countByRole(Role.CLIENT), users.countByRole(Role.TRAINER),
+                subscriptions.countActive(SubscriptionKind.PREMIUM),
+                users.adminSearch(null, null, UserStatus.SUSPENDED, Pages.of(0, 1, Sort.unsorted())).getTotalElements());
     }
 
     /** Platform revenue: commission on PT payments plus Premium and marketplace subscriptions. */
@@ -156,7 +174,8 @@ public class AdminService {
             ClientProfile c = clientProfiles.get(u.getId());
             TrainerProfile t = trainerProfiles.get(u.getId());
             String name = c != null ? c.getName() : t != null ? t.getName() : null;
-            return new UserRow(u.getId(), name, u.getEmail(), u.getRole(), t != null ? t.getCity() : null,
+            UUID photo = c != null ? c.getPhotoFileId() : t != null ? t.getPhotoFileId() : null;
+            return new UserRow(u.getId(), name, com.trakio.core.files.FileService.url(photo), u.getEmail(), u.getRole(), t != null ? t.getCity() : null,
                     premium.contains(u.getId()), coaching.findActiveForClient(u.getId()).isPresent(),
                     t == null ? null : t.isVerified(), t == null ? null : listed.contains(u.getId()), u.getCreatedAt(),
                     u.getLastSeenAt(), u.getStatus());
@@ -198,10 +217,17 @@ public class AdminService {
             }
         });
         Map<UUID, String> names = new java.util.HashMap<>();
-        clients.findByUserIdIn(people).forEach(c -> names.put(c.getUserId(), c.getName()));
-        trainers.findByUserIdIn(people).forEach(t -> names.put(t.getUserId(), t.getName()));
+        Map<UUID, String> photos = new java.util.HashMap<>();
+        clients.findByUserIdIn(people).forEach(c -> {
+            names.put(c.getUserId(), c.getName());
+            photos.put(c.getUserId(), com.trakio.core.files.FileService.url(c.getPhotoFileId()));
+        });
+        trainers.findByUserIdIn(people).forEach(t -> {
+            names.put(t.getUserId(), t.getName());
+            photos.put(t.getUserId(), com.trakio.core.files.FileService.url(t.getPhotoFileId()));
+        });
         return PageResponse.of(result, (Payment p) -> new PaymentRow(p.getId(), p.getPaidAt() == null ? p.getCreatedAt() : p.getPaidAt(),
-                names.getOrDefault(p.getPayerId(), "—"), p.getTrainerId() == null ? null : names.getOrDefault(p.getTrainerId(), "—"),
+                names.getOrDefault(p.getPayerId(), "—"), photos.get(p.getPayerId()), p.getTrainerId() == null ? null : names.getOrDefault(p.getTrainerId(), "—"),
                 p.getKind(), p.getDescription(), p.getAmountCents(), p.getFeeCents(), p.getStatus(), p.getRefundReason()));
     }
 
@@ -239,6 +265,15 @@ public class AdminService {
         exercise.setDemoStatus(status);
         audit.record(adminId, "exercise.demo." + Enums.json(status), "exercise", exerciseId.toString(), "");
         return row(exercise);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> demoTotals() {
+        Map<String, Long> totals = new java.util.LinkedHashMap<>();
+        for (DemoStatus status : DemoStatus.values()) {
+            totals.put(Enums.json(status), exercises.countByDemoStatus(status));
+        }
+        return totals;
     }
 
     private ExerciseRow row(Exercise e) {

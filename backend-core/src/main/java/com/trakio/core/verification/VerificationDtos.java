@@ -24,10 +24,10 @@ public final class VerificationDtos {
     public record DocumentInput(@NotNull UUID fileId, LocalDate validUntil) {}
 
     /** Admin queue row. */
-    public record QueueItem(UUID id, UUID trainerId, String name, String city, List<String> specialties,
-            VerificationStatus status, Instant submittedAt, boolean ready, long pendingDocuments) {}
+    public record QueueItem(UUID id, UUID trainerId, String name, String photoUrl, String city, List<String> specialties,
+            VerificationStatus status, Instant submittedAt, Instant decidedAt, boolean ready, long pendingDocuments) {}
 
-    public record AdminDetail(UUID id, UUID trainerId, String name, String email, String city, String where,
+    public record AdminDetail(UUID id, UUID trainerId, String name, String photoUrl, String email, String city, String where,
             List<String> specialties, String bio, List<PackageView> packages, VerificationStatus status, String adminNote,
             Instant submittedAt, List<DocumentView> documents, PayoutStep payouts) {}
 

@@ -6,11 +6,11 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { AppText } from '@/components/AppText';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { IconButton } from '@/components/Surface';
-import { cities, specialties, trainers, type City, type Specialty, type Trainer } from '@/features/marketplace/data';
+import { cities, specialties, useTrainers, type City, type Specialty, type Trainer } from '@/features/marketplace/data';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
 
@@ -20,8 +20,9 @@ export default function FindTrainer() {
   const [city, setCity] = useState<City>('Lisboa');
   const [focus, setFocus] = useState<Specialty | null>('Hipertrofia');
 
+  const { trainers, error } = useTrainers();
   const q = query.trim().toLowerCase();
-  const results = trainers
+  const results = (trainers ?? [])
     .filter((t) => t.cities.includes(city) || t.cities.includes('Online'))
     .filter((t) => !q || t.name.toLowerCase().includes(q) || t.specialties.toLowerCase().includes(q))
     // Specialty ranks matches first ("Relevância") rather than hiding everyone else.
@@ -100,7 +101,11 @@ export default function FindTrainer() {
         ))}
         {results.length === 0 ? (
           <AppText variant="small" tone="muted" style={styles.empty}>
-            Nenhum PT encontrado. Experimenta outra cidade ou pesquisa.
+            {error
+              ? 'Sem ligação ao servidor. Puxa para baixo para tentar outra vez.'
+              : trainers === null
+                ? 'A carregar…'
+                : 'Nenhum PT encontrado. Experimenta outra cidade ou pesquisa.'}
           </AppText>
         ) : null}
       </View>
@@ -113,10 +118,10 @@ function TrainerCard({ trainer }: { trainer: Trainer }) {
     <PressableScale
       onPress={() => router.push({ pathname: '/trainers/[id]', params: { id: trainer.id } })}
       pressedScale={0.98}
-      accessibilityLabel={`${trainer.name}, ${trainer.specialties}, desde ${trainer.fromPrice} euros por mês`}
+      accessibilityLabel={`${trainer.name}, ${trainer.specialties}${trainer.fromPrice ? `, desde ${trainer.fromPrice} euros` : ''}`}
       style={styles.card}
     >
-      <Portrait person={trainer.id} size={52} />
+      <Avatar photoUri={trainer.photoUri} size={52} name={trainer.name} />
       <View style={styles.flex}>
         <View style={styles.nameRow}>
           <AppText style={styles.name}>{trainer.name}</AppText>
@@ -128,7 +133,7 @@ function TrainerCard({ trainer }: { trainer: Trainer }) {
         <View style={styles.ratingRow}>
           <Icon name="starFilled" size={12} />
           <AppText variant="caption" tone="muted">
-            {trainer.rating} ({trainer.reviews}) · {trainer.where}
+            {trainer.rating ? `${trainer.rating} (${trainer.reviews})` : 'Novo'} · {trainer.where}
           </AppText>
         </View>
       </View>
@@ -137,7 +142,7 @@ function TrainerCard({ trainer }: { trainer: Trainer }) {
           desde
         </AppText>
         <View style={styles.priceRow}>
-          <AppText style={styles.priceValue}>{trainer.fromPrice}€</AppText>
+          <AppText style={styles.priceValue}>{trainer.fromPrice ?? '—'}€</AppText>
           <AppText variant="overline" tone="muted" style={styles.priceFrom}>
             /mês
           </AppText>

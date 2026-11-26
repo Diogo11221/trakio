@@ -7,16 +7,16 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Checkbox } from '@/components/Checkbox';
 import { Icon } from '@/components/Icon';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { Card, CardRow, SectionLabel } from '@/components/Surface';
-import { exerciseLibrary, planTemplates } from '@/features/workout/data';
-import { nextPlanId, startOfWeek, useHistory, type Session } from '@/features/workout/history';
+import { usePlan } from '@/features/workout/plan';
+import { startOfWeek, useHistory, type Session } from '@/features/workout/history';
 import { useStartWorkout } from '@/features/workout/useStartWorkout';
 import { formatThousands } from '@/lib/format';
-import { refreshMockData } from '@/lib/refresh';
+import { refreshAll } from '@/lib/refresh';
 import { useClientProfile } from '@/state/auth';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -43,14 +43,14 @@ export default function Train() {
   const [weekStart] = useState(() => startOfWeek(new Date()));
   const { height } = useWindowDimensions();
 
-  const next = nextPlanId(sessions);
+  const { planTemplates, exerciseLibrary, nextPlanId: next, planName } = usePlan();
   const thisWeek = sessions.filter((s) => s.finishedAt >= weekStart);
   const recent = sessions.slice(0, 5);
   const groups = [...new Set(exerciseLibrary.map((e) => e.group))];
 
   return (
     <>
-      <Screen gap={16} onRefresh={refreshMockData}>
+      <Screen gap={16} onRefresh={refreshAll}>
         <Reveal index={0}>
           <AppText variant="title">Treinar</AppText>
         </Reveal>
@@ -61,7 +61,7 @@ export default function Train() {
             accessibilityLabel={profile.trainer ? `Falar com ${profile.trainer.name} sobre o plano` : 'Encontrar um PT'}
           >
             <Card style={styles.plan}>
-              {profile.trainer ? <Portrait person={profile.trainer.id} size={36} /> : (
+              {profile.trainer ? <Avatar photoUri={profile.trainer.photoUri} size={36} name={profile.trainer.name} /> : (
                 <View style={[styles.thumbSmall, styles.thumbIcon]}>
                   <Icon name="dumbbellMuted" size={18} />
                 </View>
@@ -71,7 +71,7 @@ export default function Train() {
                   {profile.daysPerWeek}× por semana · {thisWeek.length} {thisWeek.length === 1 ? 'feito' : 'feitos'} esta semana
                 </AppText>
                 <AppText variant="caption" tone="muted">
-                  {profile.trainer ? `Plano de ${profile.trainer.name} · toca para conversar` : 'Plano Trakio A · B · C · queres um PT?'}
+                  {profile.trainer ? `${planName} · plano de ${profile.trainer.name} · toca para conversar` : `${planName} · queres um PT?`}
                 </AppText>
               </View>
               <Icon name="chevronRightFaint" size={14} />

@@ -113,8 +113,18 @@ class AdminController {
 
     // Verification
     @GetMapping("/verifications")
-    List<QueueItem> verifications() {
-        return verification.queue();
+    List<QueueItem> verifications(@RequestParam(required = false) String status) {
+        return verification.list(status);
+    }
+
+    @GetMapping("/settings")
+    AdminDtos.Settings settings() {
+        return admin.settings();
+    }
+
+    @GetMapping("/users/totals")
+    AdminDtos.Totals totals() {
+        return admin.totals();
     }
 
     @GetMapping("/verifications/{id}")
@@ -135,8 +145,8 @@ class AdminController {
 
     // Reports
     @GetMapping("/reports")
-    List<ModerationService.ReportView> reports() {
-        return moderation.open();
+    List<ModerationService.ReportView> reports(@RequestParam(required = false) String status) {
+        return "resolved".equals(status) ? moderation.resolved() : moderation.open();
     }
 
     @PostMapping("/reports/{id}/resolve")
@@ -151,6 +161,11 @@ class AdminController {
             @RequestParam(required = false) String group, @RequestParam(required = false) String demo,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
         return admin.exercises(q, group, demo, page, size);
+    }
+
+    @GetMapping("/exercises/demo-totals")
+    java.util.Map<String, Long> demoTotals() {
+        return admin.demoTotals();
     }
 
     @PostMapping("/exercises")

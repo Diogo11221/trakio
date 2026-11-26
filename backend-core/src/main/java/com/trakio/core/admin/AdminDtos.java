@@ -21,12 +21,19 @@ public final class AdminDtos {
     public record Overview(String month, long activeUsers, long totalUsers, long clients, long trainers, long marketplaceTrainers,
             long newTrainersThisMonth, long premiumSubscribers, long revenueCents, Double revenueChangePercent,
             long processedCents, List<MonthRevenue> revenueByMonth, long aiMealsThisMonth, long pendingVerifications,
-            long openReports) {}
+            long openReports, long refundRequests, long disputes) {}
 
-    public record UserRow(UUID id, String name, String email, Role role, String city, boolean premium, boolean coached,
+    public record Settings(int platformFeePercent, int premiumPriceCents, int marketplacePriceCents, String paymentsProvider,
+            boolean aiEnabled, List<TeamMember> admins) {}
+
+    public record TeamMember(UUID id, String email, Instant since, Instant lastSeenAt) {}
+
+    public record Totals(long all, long clients, long trainers, long premium, long suspended) {}
+
+    public record UserRow(UUID id, String name, String photoUrl, String email, Role role, String city, boolean premium, boolean coached,
             Boolean verified, Boolean listed, Instant since, Instant lastSeenAt, UserStatus status) {}
 
-    public record PaymentRow(UUID id, Instant date, String payer, String trainer, com.trakio.core.billing.PaymentKind kind,
+    public record PaymentRow(UUID id, Instant date, String payer, String payerPhotoUrl, String trainer, com.trakio.core.billing.PaymentKind kind,
             String description, long amountCents, long feeCents, com.trakio.core.billing.PaymentStatus status,
             String refundReason) {}
 

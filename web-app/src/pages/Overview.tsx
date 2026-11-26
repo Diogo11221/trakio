@@ -3,39 +3,56 @@ import { Link } from 'react-router';
 
 import { Icon, type IconName } from '../components/Icon';
 import { Card, Dropdown, PageHeader } from '../components/ui';
-import { aiMeals, kpis, months, revenueByMonth } from '../data/mock';
-import { useAdmin } from '../data/store';
+import { useApi } from '../data/store';
+import type { Overview as OverviewData } from '../data/types';
 import { thousands } from '../lib';
 import p from './pages.module.css';
 import s from './Overview.module.css';
 
+const monthName = new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' });
+const shortMonth = new Intl.DateTimeFormat('pt-PT', { month: 'short' });
+
+function lastMonths() {
+  const now = new Date();
+  return [0, 1, 2].map((back) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - back, 1);
+    const label = monthName.format(d);
+    return { id: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: label.charAt(0).toUpperCase() + label.slice(1) };
+  });
+}
+
 /** Admin · Visão geral. */
 export function Overview() {
-  const { pendingVerifications, openReports, payments } = useAdmin();
+  const [months] = useState(lastMonths);
   const [month, setMonth] = useState(months[0]?.id ?? '');
-  const refunds = payments.filter((x) => x.status === 'refund-requested').length;
-  const disputes = payments.filter((x) => x.status === 'disputed').length;
+  const { data: o, error } = useApi<OverviewData>(`/api/v1/admin/overview?month=${month}`);
 
   const review: { to: string; title: string; detail: string; count: number; icon: IconName; hot?: boolean }[] = [
-    { to: '/verificacao', title: 'PTs a verificar', detail: 'Documentos e conta de pagamentos', count: pendingVerifications, icon: 'navVerify', hot: true },
-    { to: '/denuncias', title: 'Denúncias', detail: '1 avaliação, 1 perfil', count: openReports, icon: 'navReports' },
-    { to: '/pagamentos', title: 'Reembolsos pedidos', detail: 'Sessão online não realizada', count: refunds, icon: 'navPayments' },
-    { to: '/pagamentos', title: 'Disputa de pagamento', detail: 'Banco do aluno contestou 50 €', count: disputes, icon: 'navPayments' },
+    { to: '/verificacao', title: 'PTs a verificar', detail: 'Documentos e conta de pagamentos', count: o?.pendingVerifications ?? 0, icon: 'navVerify', hot: true },
+    { to: '/denuncias', title: 'Denúncias', detail: 'Avaliações e perfis reportados', count: o?.openReports ?? 0, icon: 'navReports' },
+    { to: '/pagamentos', title: 'Reembolsos pedidos', detail: 'Alunos à espera de resposta', count: o?.refundRequests ?? 0, icon: 'navPayments' },
+    { to: '/pagamentos', title: 'Disputas de pagamento', detail: 'Bancos que contestaram pagamentos', count: o?.disputes ?? 0, icon: 'navPayments' },
   ];
+  const change = o?.revenueChangePercent ?? null;
 
   return (
     <>
       <PageHeader
         title="Visão geral"
-        subtitle="Como está a plataforma este mês"
+        subtitle={error ? `Sem dados: ${error}` : 'Como está a plataforma este mês'}
         actions={<Dropdown options={months.map((m) => ({ value: m.id, label: m.label }))} value={month} onChange={setMonth} label="Mês" />}
       />
 
       <Card className={p.kpis}>
-        <Kpi label="Utilizadores ativos" value={thousands(kpis.activeUsers)} delta={`↑ ${kpis.activeUsersChange}%`} />
-        <Kpi label="PTs no marketplace" value={String(kpis.marketplacePts)} delta={`+${kpis.newPtsThisMonth} este mês`} neutral />
-        <Kpi label="Receita da plataforma" value={thousands(kpis.revenue)} unit="€" delta={`↑ ${kpis.revenueChange}%`} />
-        <Kpi label="Pagamentos processados" value={thousands(kpis.processed)} unit="€" />
+        <Kpi label="Utilizadores ativos (30 dias)" value={o ? thousands(o.activeUsers) : '—'} delta={o ? `de ${thousands(o.totalUsers)}` : undefined} neutral />
+        <Kpi label="PTs no marketplace" value={o ? String(o.marketplaceTrainers) : '—'} delta={o ? `+${o.newTrainersThisMonth} este mês` : undefined} neutral />
+        <Kpi
+          label="Receita da plataforma"
+          value={o ? thousands(o.revenueCents / 100) : '—'}
+          unit="€"
+          delta={change === null ? undefined : `${change >= 0 ? '↑' : '↓'} ${Math.abs(Math.round(change))}%`}
+        />
+        <Kpi label="Pagamentos processados" value={o ? thousands(o.processedCents / 100) : '—'} unit="€" />
       </Card>
 
       <div className={s.grid}>
@@ -44,14 +61,21 @@ export function Overview() {
             <div className={s.cardHead}>
               <div>
                 <h2 className={s.cardTitle}>Receita por mês</h2>
-                <p className={s.cardSub}>Taxas dos pagamentos aos PTs + subscrições do marketplace</p>
+                <p className={s.cardSub}>Taxas dos pagamentos aos PTs + subscrições (marketplace e Premium)</p>
               </div>
               <div className={s.legend}>
                 <span><i className={s.swatchDark} />Taxas</span>
                 <span><i className={s.swatchVolt} />Subscrições</span>
               </div>
             </div>
-            <RevenueChart />
+            {o ? (
+              <RevenueChart
+                data={o.revenueByMonth.map((m) => {
+                  const [y, mo] = m.month.split('-').map(Number);
+                  return { month: shortMonth.format(new Date(y ?? 2026, (mo ?? 1) - 1, 1)).replace('.', ''), fees: m.feesCents / 100, subscriptions: m.subscriptionsCents / 100 };
+                })}
+              />
+            ) : null}
           </Card>
 
           <Card className={s.aiCard}>
@@ -60,9 +84,9 @@ export function Overview() {
               <span className={s.cardSub}>Funcionalidade Premium</span>
             </div>
             <div className={s.aiStats}>
-              <AiStat value={thousands(aiMeals.logged)} label="refeições registadas" />
-              <AiStat value={thousands(aiMeals.premium)} label="assinantes Premium" />
-              <AiStat value={`${aiMeals.aiCost} €`} label="custo da IA este mês" />
+              <AiStat value={o ? thousands(o.aiMealsThisMonth) : '—'} label="refeições com IA este mês" />
+              <AiStat value={o ? thousands(o.premiumSubscribers) : '—'} label="assinantes Premium" />
+              <AiStat value={o ? thousands(o.clients) : '—'} label="alunos no total" />
             </div>
           </Card>
         </div>
@@ -117,10 +141,10 @@ function AiStat({ value, label }: { value: string; label: string }) {
 }
 
 /** Stacked bars (fees + subscriptions) that grow in on load; hover shows the split. */
-function RevenueChart() {
+function RevenueChart({ data: revenueByMonth }: { data: { month: string; fees: number; subscriptions: number }[] }) {
   const [grown, setGrown] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(...revenueByMonth.map((m) => m.fees + m.subscriptions));
+  const max = Math.max(1, ...revenueByMonth.map((m) => m.fees + m.subscriptions));
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setGrown(true));

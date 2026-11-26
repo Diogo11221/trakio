@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import * as localAuth from '@/features/auth/localAuth';
-import { demoTrainerLink, type ClientProfile, type Profile, type PublicAccount, type Role, type TrainerProfile } from '@/features/auth/types';
+import * as remote from '@/features/auth/remoteAuth';
+import type { ClientProfile, Profile, PublicAccount, Role, TrainerProfile } from '@/features/auth/types';
+import { onSessionExpired } from '@/lib/api';
 
 type AuthState = { status: 'loading' } | { status: 'signedOut' } | { status: 'signedIn'; account: PublicAccount };
 
@@ -12,23 +13,28 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<PublicAccount>;
   signOut: () => Promise<void>;
   saveProfile: (profile: Profile) => Promise<PublicAccount>;
-  deleteAccount: () => Promise<void>;
+  /** Re-reads the account (after a payment, a weigh-in, hiring a PT…). */
+  refresh: () => Promise<PublicAccount | null>;
+  changePassword: (current: string, next: string) => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** Session for the test accounts — restored from the phone on launch. */
+/** Session on backend-core — restored from the phone's secure storage on launch. */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
 
   useEffect(() => {
     let alive = true;
-    localAuth
+    remote
       .currentAccount()
       .then((account) => alive && setState(account ? { status: 'signedIn', account } : { status: 'signedOut' }))
       .catch(() => alive && setState({ status: 'signedOut' }));
+    const off = onSessionExpired(() => setState({ status: 'signedOut' }));
     return () => {
       alive = false;
+      off();
     };
   }, []);
 
@@ -43,19 +49,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       account,
-      signUp: (email, password, role) => localAuth.signUp(email, password, role).then(signedIn),
-      signIn: (email, password) => localAuth.signIn(email, password).then(signedIn),
+      signUp: (email, password, role) => remote.signUp(email, password, role).then(signedIn),
+      signIn: (email, password) => remote.signIn(email, password).then(signedIn),
       signOut: async () => {
-        await localAuth.signOut();
+        await remote.signOut();
         setState({ status: 'signedOut' });
       },
-      saveProfile: async (profile) => {
-        if (!account) throw new Error('Not signed in');
-        return signedIn(await localAuth.saveProfile(account.id, profile));
+      saveProfile: async (profile) => signedIn(await remote.saveProfile(profile)),
+      refresh: async () => {
+        if (state.status !== 'signedIn') return null;
+        try {
+          return signedIn(await remote.reload());
+        } catch {
+          return null;
+        }
       },
-      deleteAccount: async () => {
-        if (!account) return;
-        await localAuth.deleteAccount(account.id);
+      changePassword: async (current, next) => {
+        signedIn(await remote.changePassword(current, next));
+      },
+      deleteAccount: async (password) => {
+        await remote.deleteAccount(password);
         setState({ status: 'signedOut' });
       },
     }),
@@ -77,43 +90,45 @@ export function homeFor(account: PublicAccount): '/onboarding' | '/today' | '/pt
   return account.role === 'trainer' ? '/pt/home' : '/today';
 }
 
-const fallbackClient: ClientProfile = {
+/** Shown for a moment while signing out or when a screen opens without a session. */
+const emptyClient: ClientProfile = {
   kind: 'client',
-  name: 'Miguel Costa',
+  name: '',
   photoUri: null,
-  demoPerson: 'miguel',
   sex: 'male',
-  birthYear: 1997,
-  heightCm: 178,
-  weightKg: 78.4,
+  birthYear: 1995,
+  heightCm: 175,
+  weightKg: 75,
   goalWeightKg: null,
-  goal: 'gain',
-  activity: 'moderate',
-  daysPerWeek: 4,
-  experience: 'some',
-  coached: true,
-  trainer: demoTrainerLink,
+  goal: 'maintain',
+  activity: 'light',
+  daysPerWeek: 3,
+  experience: 'new',
+  coached: false,
+  trainer: null,
 };
 
-const fallbackTrainer: TrainerProfile = {
+const emptyTrainer: TrainerProfile = {
   kind: 'trainer',
-  name: 'Rita Santos',
+  name: '',
   photoUri: null,
-  demoPerson: 'rita',
-  city: 'Lisboa',
-  online: true,
-  specialties: ['Hipertrofia'],
+  article: 'o',
+  city: '',
+  area: '',
+  online: false,
+  bio: '',
+  specialties: [],
+  verified: false,
 };
 
-/** Signed-in client's profile (falls back to the demo client when opened without a session, e.g. deep links). */
 export function useClientProfile(): ClientProfile {
   const { account } = useAuth();
-  return account?.profile?.kind === 'client' ? account.profile : fallbackClient;
+  return account?.profile?.kind === 'client' ? account.profile : emptyClient;
 }
 
 export function useTrainerProfile(): TrainerProfile {
   const { account } = useAuth();
-  return account?.profile?.kind === 'trainer' ? account.profile : fallbackTrainer;
+  return account?.profile?.kind === 'trainer' ? account.profile : emptyTrainer;
 }
 
 export function firstName(name: string): string {

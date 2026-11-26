@@ -1,17 +1,20 @@
 import { useState } from 'react';
 
-import { Portrait } from '../components/Portrait';
+import { ApiError, api } from '../api';
+import { Photo } from '../components/Photo';
 import { Button, Card, ConfirmDialog, PageHeader, StatusPill, Tabs, type Tone } from '../components/ui';
-import { disputeCase, kpis, refundCase, type Payment, type PaymentStatus } from '../data/mock';
-import { useAdmin } from '../data/store';
-import { euros, thousands } from '../lib';
+import { useAdmin, useApi } from '../data/store';
+import { dayMonth, fullDate, type Overview, type Page, type PaymentRow, type PaymentStatus } from '../data/types';
+import { euros } from '../lib';
 import p from './pages.module.css';
 import s from './Payments.module.css';
 
-type Filter = 'all' | 'refunds' | 'disputes' | 'transfers';
+type Filter = 'all' | 'refunds' | 'disputes' | 'coaching' | 'subscriptions';
 
 const statusInfo: Record<PaymentStatus, { tone: Tone; label: string }> = {
+  pending: { tone: 'neutral', label: 'Por pagar' },
   paid: { tone: 'success', label: 'Pago' },
+  failed: { tone: 'neutral', label: 'Falhou' },
   'refund-requested': { tone: 'warning', label: 'Reembolso pedido' },
   disputed: { tone: 'danger', label: 'Em disputa' },
   refunded: { tone: 'neutral', label: 'Reembolsado' },
@@ -19,81 +22,104 @@ const statusInfo: Record<PaymentStatus, { tone: Tone; label: string }> = {
   'refund-declined': { tone: 'neutral', label: 'Reembolso recusado' },
 };
 
-function exportCsv(rows: Payment[]) {
-  const header = ['Data', 'Aluno', 'PT', 'Pacote', 'Valor (EUR)', 'Taxa (EUR)', 'Estado'];
+const query: Record<Filter, string> = {
+  all: '',
+  refunds: '&status=refund-requested',
+  disputes: '&status=disputed',
+  coaching: '&kind=coaching',
+  subscriptions: '&kind=marketplace',
+};
+
+function exportCsv(rows: PaymentRow[]) {
+  const header = ['Data', 'Quem pagou', 'PT', 'Descrição', 'Valor (EUR)', 'Taxa (EUR)', 'Estado'];
   const lines = rows.map((r) =>
-    [r.date, r.student.name, r.trainer, r.pack, r.amount.toFixed(2), r.fee === null ? '' : r.fee.toFixed(2), statusInfo[r.status].label]
+    [r.date.slice(0, 10), r.payer, r.trainer ?? '', r.description, (r.amountCents / 100).toFixed(2), (r.feeCents / 100).toFixed(2), statusInfo[r.status].label]
       .map((v) => `"${String(v).replace(/"/g, '""')}"`)
       .join(';'),
   );
-  const blob = new Blob([`﻿${[header.join(';'), ...lines].join('\n')}`], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob([`\uFEFF${[header.join(';'), ...lines].join('\n')}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'trakio-pagamentos-novembro-2026.csv';
+  a.download = `trakio-pagamentos-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 /** Admin · Pagamentos e reembolsos. */
 export function Payments() {
-  const { payments, setPaymentStatus, notify } = useAdmin();
+  const { notify } = useAdmin();
   const [filter, setFilter] = useState<Filter>('all');
-  const [selectedId, setSelectedId] = useState(refundCase.paymentId);
-  const [dialog, setDialog] = useState<'refund' | 'decline' | 'dispute-accept' | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<'refund' | 'decline' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { data, reload } = useApi<Page<PaymentRow>>(`/api/v1/admin/payments?size=100${query[filter]}`);
+  const overview = useApi<Overview>('/api/v1/admin/overview');
+  const refundsOpen = useApi<Page<PaymentRow>>('/api/v1/admin/payments?size=1&status=refund-requested');
+  const disputesOpen = useApi<Page<PaymentRow>>('/api/v1/admin/payments?size=1&status=disputed');
+  const list = data?.content ?? [];
+  const selected = list.find((x) => x.id === selectedId) ?? list[0] ?? null;
+  const month = overview.data?.revenueByMonth.at(-1);
+  const openRefunds = refundsOpen.data?.totalElements ?? 0;
 
-  const list = payments.filter((x) =>
-    filter === 'refunds'
-      ? x.status === 'refund-requested' || x.status === 'refunded' || x.status === 'refund-declined'
-      : filter === 'disputes'
-        ? x.status === 'disputed'
-        : filter === 'transfers'
-          ? x.kind === 'student' && x.status === 'paid'
-          : true,
-  );
-  const selected = payments.find((x) => x.id === selectedId) ?? payments[0];
-  const refunded = payments.filter((x) => x.status === 'refunded').reduce((sum, x) => sum + x.amount, 0);
-  const openRefunds = payments.filter((x) => x.status === 'refund-requested').length;
+  const decide = async (decision: 'approve' | 'decline' | 'reschedule', message: string) => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/v1/admin/payments/${selected.id}/refund-decision`, { decision });
+      notify(message);
+      await Promise.all([reload(), refundsOpen.reload(), overview.reload()]);
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : 'Não foi possível guardar.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
       <PageHeader
         title="Pagamentos"
-        subtitle="Pagamentos dos alunos aos PTs, taxas da Trakio e subscrições do marketplace."
+        subtitle="Pagamentos dos alunos aos PTs, taxas da Trakio e subscrições."
         actions={
           <Button
             variant="outline"
             size="sm"
+            disabled={list.length === 0}
             onClick={() => {
-              exportCsv(payments);
-              notify('Exportação de novembro descarregada.');
+              exportCsv(list);
+              notify('Exportação descarregada.');
             }}
           >
-            Exportar novembro
+            Exportar lista
           </Button>
         }
       />
 
       <Card className={p.kpis}>
-        <KpiNote label="Processado este mês" value={`${thousands(kpis.processed)} €`} note="pagamentos de alunos" />
-        <KpiNote label="Taxas da Trakio" value="6 426 €" note="10% de cada pagamento" />
-        <KpiNote label="Subscrições de PTs" value="504 €" note="126 PTs × 4 €" />
+        <KpiNote label="Processado este mês" value={overview.data ? euros(overview.data.processedCents / 100) : '—'} note="todos os pagamentos" />
+        <KpiNote label="Taxas da Trakio" value={month ? euros(month.feesCents / 100) : '—'} note="comissão nos pagamentos aos PTs" />
+        <KpiNote label="Subscrições" value={month ? euros(month.subscriptionsCents / 100) : '—'} note="marketplace e Premium" />
         <KpiNote
-          label="Reembolsado"
-          value={`${thousands(refunded)} €`}
-          note={openRefunds === 1 ? '1 pedido por decidir' : openRefunds === 0 ? 'Nenhum pedido por decidir' : `${openRefunds} pedidos por decidir`}
+          label="Por decidir"
+          value={String(openRefunds + (disputesOpen.data?.totalElements ?? 0))}
+          note={openRefunds === 1 ? '1 pedido de reembolso' : `${openRefunds} pedidos de reembolso`}
         />
       </Card>
 
       <Tabs
         label="Filtrar pagamentos"
         value={filter}
-        onChange={setFilter}
+        onChange={(f) => {
+          setFilter(f);
+          setSelectedId(null);
+        }}
         options={[
           { value: 'all', label: 'Todos' },
           { value: 'refunds', label: 'Reembolsos pedidos', count: openRefunds },
-          { value: 'disputes', label: 'Disputas', count: payments.filter((x) => x.status === 'disputed').length },
-          { value: 'transfers', label: 'Transferências para PTs' },
+          { value: 'disputes', label: 'Disputas', count: disputesOpen.data?.totalElements ?? 0 },
+          { value: 'coaching', label: 'Alunos → PTs' },
+          { value: 'subscriptions', label: 'Subscrições do marketplace' },
         ]}
       />
 
@@ -103,10 +129,10 @@ export function Payments() {
             <thead>
               <tr>
                 <th style={{ width: 76 }}>Data</th>
-                <th>Aluno → PT</th>
-                <th style={{ width: 150 }}>Pacote</th>
-                <th style={{ width: 80, textAlign: 'right' }}>Valor</th>
-                <th style={{ width: 76, textAlign: 'right' }}>Taxa</th>
+                <th>Quem pagou → PT</th>
+                <th style={{ width: 180 }}>Descrição</th>
+                <th style={{ width: 90, textAlign: 'right' }}>Valor</th>
+                <th style={{ width: 80, textAlign: 'right' }}>Taxa</th>
                 <th style={{ width: 150 }}>Estado</th>
               </tr>
             </thead>
@@ -119,19 +145,19 @@ export function Payments() {
                     className={`${p.rowClickable} ${row.id === selected?.id ? p.rowSelected : ''}`}
                     onClick={() => setSelectedId(row.id)}
                   >
-                    <td>{row.date}</td>
+                    <td>{dayMonth(row.date)}</td>
                     <td>
                       <span className={p.person}>
-                        {row.student.person ? <Portrait person={row.student.person} size={28} /> : <span className={s.allPts}>PT</span>}
+                        <Photo url={row.payerPhotoUrl} name={row.payer} size={28} />
                         <span className={p.twoLine}>
-                          <span className={p.strong}>{row.student.name}</span>
-                          <span className={p.small}>{row.kind === 'student' ? `para ${row.trainer}` : row.trainer}</span>
+                          <span className={p.strong}>{row.payer}</span>
+                          <span className={p.small}>{row.trainer ? `para ${row.trainer}` : row.kind === 'premium' ? 'Trakio Premium' : 'Trakio'}</span>
                         </span>
                       </span>
                     </td>
-                    <td>{row.pack}</td>
-                    <td className={p.num}>{euros(row.amount)}</td>
-                    <td className={p.num}>{row.fee === null ? '—' : euros(row.fee)}</td>
+                    <td>{row.description.split(' · ')[0]}</td>
+                    <td className={p.num}>{euros(row.amountCents / 100)}</td>
+                    <td className={p.num}>{row.feeCents > 0 ? euros(row.feeCents / 100) : '—'}</td>
                     <td>
                       <StatusPill tone={info.tone} label={info.label} />
                     </td>
@@ -140,60 +166,56 @@ export function Payments() {
               })}
             </tbody>
           </table>
-          {list.length === 0 ? <p className={p.empty}>Nada neste filtro.</p> : null}
+          {data && list.length === 0 ? <p className={p.empty}>Nada neste filtro.</p> : null}
         </Card>
 
         {selected ? (
           <Card key={selected.id + selected.status} className={s.panel}>
             <StatusPill tone={statusInfo[selected.status].tone} label={statusInfo[selected.status].label} />
             <div className={p.person}>
-              {selected.student.person ? <Portrait person={selected.student.person} size={44} /> : null}
+              <Photo url={selected.payerPhotoUrl} name={selected.payer} size={44} />
               <div className={p.twoLine}>
                 <span className={s.panelTitle}>
                   {selected.status === 'refund-requested'
-                    ? `${selected.student.name.split(' ')[0]} pede ${euros(selected.amount)}`
+                    ? `${selected.payer.split(' ')[0]} pede ${euros(selected.amountCents / 100)}`
                     : selected.status === 'disputed'
-                      ? `Disputa de ${euros(selected.amount)}`
-                      : `${selected.student.name} · ${euros(selected.amount)}`}
+                      ? `Disputa de ${euros(selected.amountCents / 100)}`
+                      : `${selected.payer} · ${euros(selected.amountCents / 100)}`}
                 </span>
                 <span className={`${p.muted} ${p.small}`}>
-                  {selected.pack} com {selected.trainer} · {selected.date}
+                  {selected.description} · {fullDate(selected.date)}
                 </span>
               </div>
             </div>
 
-            {selected.id === refundCase.paymentId || selected.id === disputeCase.paymentId ? (
-              <CaseDetail kind={selected.id === refundCase.paymentId ? 'refund' : 'dispute'} />
-            ) : (
-              <div className={s.summary}>
-                <Line label="Pago pelo aluno" value={euros(selected.amount)} />
-                <Line label="Taxa da Trakio" value={selected.fee === null ? '—' : `−${euros(selected.fee)}`} />
-                <Line label="Para o PT" value={euros(selected.amount - (selected.fee ?? 0))} strong />
-                <Line label="Transferência" value={selected.status === 'paid' ? '3 de dezembro' : '—'} />
+            {selected.refundReason ? (
+              <div className={s.reason}>
+                <span className={p.small}>Motivo do pedido</span>
+                <span className={p.dark}>“{selected.refundReason}”</span>
               </div>
-            )}
+            ) : null}
+
+            <div className={s.summary}>
+              <Line label="Pago" value={euros(selected.amountCents / 100)} />
+              <Line label="Taxa da Trakio" value={selected.feeCents > 0 ? `−${euros(selected.feeCents / 100)}` : '—'} />
+              {selected.kind === 'coaching' ? <Line label="Para o PT" value={euros((selected.amountCents - selected.feeCents) / 100)} strong /> : null}
+            </div>
 
             <div className={p.push} />
 
             {selected.status === 'refund-requested' ? (
               <>
                 <p className={`${p.muted} ${p.small}`}>
-                  O valor sai da próxima transferência da {selected.trainer.split(' ')[0]} e a taxa da Trakio também é devolvida. Vais ver um
-                  resumo antes de confirmar.
+                  Ao reembolsar, o Stripe devolve o valor ao aluno, retira-o da conta do PT e devolve também a taxa da Trakio. O acompanhamento termina.
                 </p>
-                <Button onClick={() => setDialog('refund')}>Rever e reembolsar {euros(selected.amount)}</Button>
+                <Button disabled={busy} onClick={() => setDialog('refund')}>
+                  Rever e reembolsar {euros(selected.amountCents / 100)}
+                </Button>
                 <div className={s.secondary}>
-                  <Button
-                    variant="outline"
-                    style={{ flex: 1 }}
-                    onClick={() => {
-                      setPaymentStatus(selected.id, 'rescheduled');
-                      notify('Remarcação proposta à Sofia e à Rita.');
-                    }}
-                  >
-                    Propor remarcação
+                  <Button variant="outline" style={{ flex: 1 }} disabled={busy} onClick={() => decide('reschedule', 'Marcado como remarcado. Combina a nova data com os dois pelo email.')}>
+                    Remarcar sessão
                   </Button>
-                  <Button variant="outline" style={{ width: 110, color: 'var(--color-danger-text)' }} onClick={() => setDialog('decline')}>
+                  <Button variant="outline" style={{ width: 110, color: 'var(--color-danger-text)' }} disabled={busy} onClick={() => setDialog('decline')}>
                     Recusar
                   </Button>
                 </div>
@@ -201,12 +223,9 @@ export function Payments() {
             ) : selected.status === 'disputed' ? (
               <>
                 <p className={`${p.muted} ${p.small}`}>
-                  O Stripe dá 7 dias para responder ao banco. Se aceitares, o valor sai da próxima transferência do PT.
+                  As disputas são respondidas no painel do Stripe, com as provas (histórico de treinos e mensagens). O resultado chega aqui automaticamente.
                 </p>
-                <Button onClick={() => notify('Provas enviadas ao Stripe: histórico de treinos e mensagens.')}>Enviar provas ao banco</Button>
-                <Button variant="outline" onClick={() => setDialog('dispute-accept')}>
-                  Aceitar a disputa
-                </Button>
+                <Button onClick={() => window.open('https://dashboard.stripe.com/disputes', '_blank', 'noopener')}>Abrir disputas no Stripe</Button>
               </>
             ) : null}
           </Card>
@@ -215,50 +234,30 @@ export function Payments() {
 
       <ConfirmDialog
         open={dialog === 'refund'}
-        title={`Reembolsar ${euros(selected?.amount ?? 0)} à ${selected?.student.name ?? ''}?`}
-        confirmLabel={`Reembolsar ${euros(selected?.amount ?? 0)}`}
+        title={`Reembolsar ${euros((selected?.amountCents ?? 0) / 100)} a ${selected?.payer ?? ''}?`}
+        confirmLabel={`Reembolsar ${euros((selected?.amountCents ?? 0) / 100)}`}
         onClose={() => setDialog(null)}
         onConfirm={() => {
-          if (!selected) return;
           setDialog(null);
-          setPaymentStatus(selected.id, 'refunded');
-          notify(`Reembolso de ${euros(selected.amount)} enviado. Chega em 5 a 10 dias.`);
+          decide('approve', 'Reembolso enviado. Chega ao aluno em 5 a 10 dias úteis.');
         }}
       >
         <div className={s.summary}>
-          <Line label="Devolvido à aluna" value={euros(selected?.amount ?? 0)} strong />
-          <Line label="Sai da transferência da PT" value={`−${euros((selected?.amount ?? 0) - (selected?.fee ?? 0))}`} />
-          <Line label="Taxa da Trakio devolvida" value={`−${euros(selected?.fee ?? 0)}`} />
+          <Line label="Devolvido ao aluno" value={euros((selected?.amountCents ?? 0) / 100)} strong />
+          <Line label="Retirado ao PT" value={`−${euros(((selected?.amountCents ?? 0) - (selected?.feeCents ?? 0)) / 100)}`} />
+          <Line label="Taxa da Trakio devolvida" value={`−${euros((selected?.feeCents ?? 0) / 100)}`} />
         </div>
       </ConfirmDialog>
       <ConfirmDialog
         open={dialog === 'decline'}
         title="Recusar o reembolso?"
-        body="A aluna recebe o motivo por email. Pode responder e o pedido volta para esta lista."
-        reasonLabel="Motivo"
-        reasonPlaceholder="Ex.: a PT esteve na chamada; o histórico mostra a ligação às 10:02."
+        body="O pagamento fica como está. Explica o motivo ao aluno por email."
         confirmLabel="Recusar reembolso"
         danger
         onClose={() => setDialog(null)}
         onConfirm={() => {
-          if (!selected) return;
           setDialog(null);
-          setPaymentStatus(selected.id, 'refund-declined');
-          notify('Reembolso recusado. A aluna foi avisada.');
-        }}
-      />
-      <ConfirmDialog
-        open={dialog === 'dispute-accept'}
-        title="Aceitar a disputa?"
-        body={`O banco devolve ${euros(selected?.amount ?? 0)} ao aluno e o valor sai da próxima transferência do PT. Não dá para desfazer.`}
-        confirmLabel="Aceitar disputa"
-        danger
-        onClose={() => setDialog(null)}
-        onConfirm={() => {
-          if (!selected) return;
-          setDialog(null);
-          setPaymentStatus(selected.id, 'refunded');
-          notify('Disputa aceite. O PT foi avisado.');
+          decide('decline', 'Reembolso recusado.');
         }}
       />
     </>
@@ -283,28 +282,5 @@ function Line({ label, value, strong = false }: { label: string; value: string; 
       <span>{label}</span>
       <span className={`mono ${strong ? p.strong : ''}`}>{value}</span>
     </div>
-  );
-}
-
-function CaseDetail({ kind }: { kind: 'refund' | 'dispute' }) {
-  const data = kind === 'refund' ? refundCase : disputeCase;
-  return (
-    <>
-      <div className={s.reason}>
-        <span className={p.small}>Motivo</span>
-        <span className={p.dark}>{data.reason}</span>
-      </div>
-      <div className={p.stack}>
-        <span className={p.sectionTitle} style={{ fontSize: 14 }}>
-          Histórico
-        </span>
-        {data.history.map((h) => (
-          <div key={h.at} className={s.history}>
-            <span className={`${p.muted} mono ${p.small}`}>{h.at}</span>
-            <span>{h.text}</span>
-          </div>
-        ))}
-      </div>
-    </>
   );
 }

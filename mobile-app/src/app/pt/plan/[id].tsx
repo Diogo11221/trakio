@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,16 +9,16 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
-import { OptionCard } from '@/components/OptionCard';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { PressableScale } from '@/components/PressableScale';
 import { ReorderableList } from '@/components/ReorderableList';
 import { Reveal } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { IconButton } from '@/components/Surface';
-import { createPlanDays, exerciseLibrary, students, type PlanExercise } from '@/features/pt/data';
+import type { PlanDay, PlanExercise } from '@/features/pt/data';
 import { useTrainer } from '@/features/pt/store';
-import { formatTimeOfDay } from '@/lib/format';
+import { ApiError, api } from '@/lib/api';
+import type { ExerciseDto, Page, PlanDto } from '@/lib/apiTypes';
 import { haptics } from '@/lib/haptics';
 import { easeOut } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
@@ -34,23 +34,59 @@ function repsLabel(e: PlanExercise): string {
   return e.repsMin === e.repsMax ? String(e.repsMin) : `${e.repsMin}–${e.repsMax}`;
 }
 
-/** PT · Editor de plano — per student (from Aluno) or for a whole plan (from Planos). */
+type Loaded = { name: string; weeks: number; workoutsPerWeek: number; days: PlanDay[]; students: number };
+
+function fromDto(plan: PlanDto): PlanDay[] {
+  return plan.days.map((d) => ({
+    id: d.id,
+    label: d.label,
+    focus: d.focus,
+    exercises: d.exercises.map((e) => ({
+      id: e.id,
+      exercise: e.exercise,
+      name: e.name,
+      sets: e.sets,
+      repsMin: e.repsMin,
+      repsMax: e.repsMax,
+      restSeconds: e.restSeconds,
+      note: e.note,
+      referenceKg: e.referenceKg,
+    })),
+  }));
+}
+
+/** PT · Editor de plano — one student's plan (from Aluno) or a whole plan (from Planos). */
 export default function PlanEditor() {
   const { id, student: studentId } = useLocalSearchParams<{ id: string; student?: string }>();
   const insets = useSafeAreaInsets();
-  const { plans, planDays, savePlanDays, sendMessage } = useTrainer();
+  const { students, plans, refresh } = useTrainer();
   const student = students.find((s) => s.id === studentId);
-  const plan = plans.find((p) => p.id === id);
-  const storeKey = student ? `student:${student.id}` : (plan?.id ?? id);
+  const summary = plans.find((p) => p.id === id);
 
-  const [days, setDays] = useState(() => planDays[storeKey] ?? createPlanDays());
-  const [dayId, setDayId] = useState(days[0].id);
-  const [openId, setOpenId] = useState<string | null>('supino-inclinado');
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [days, setDays] = useState<PlanDay[]>([]);
+  const [dayId, setDayId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [scopeOpen, setScopeOpen] = useState(false);
-  const [scope, setScope] = useState<'all' | 'new'>('all');
+  const [library, setLibrary] = useState<{ slug: string; name: string }[]>([]);
+  const [saving, setSaving] = useState(false);
   // Ids for exercises added here only need to be unique within the plan.
   const added = useRef(0);
+
+  useEffect(() => {
+    const path = studentId ? `/api/v1/trainer/students/${studentId}/plan` : `/api/v1/plans/${id}`;
+    Promise.all([api.get<PlanDto>(path), api.get<Page<ExerciseDto>>('/api/v1/exercises?size=100')])
+      .then(([plan, exercises]) => {
+        const planDays = fromDto(plan);
+        setLoaded({ name: plan.name, weeks: plan.weeks, workoutsPerWeek: plan.workoutsPerWeek, days: planDays, students: summary?.students ?? 0 });
+        setDays(planDays);
+        setDayId(planDays[0]?.id ?? null);
+        setLibrary(exercises.content.map((e) => ({ slug: e.slug, name: e.name })));
+      })
+      .catch(() => Alert.alert('Não foi possível abrir o plano', 'Tenta outra vez.', [{ text: 'Voltar', onPress: () => router.back() }]));
+    // Load once per screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, studentId]);
 
   const day = days.find((d) => d.id === dayId) ?? days[0];
 
@@ -67,14 +103,15 @@ export default function PlanEditor() {
         if (d.id !== dayId) return d;
         const exercises = [...d.exercises];
         const [moved] = exercises.splice(from, 1);
-        exercises.splice(to, 0, moved);
+        if (moved) exercises.splice(to, 0, moved);
         return { ...d, exercises };
       }),
     );
 
-  const addExercise = (name: string) => {
+  const addExercise = (slug: string, name: string) => {
     const exercise: PlanExercise = {
-      id: `${name}-${(added.current += 1)}`,
+      id: `${slug}-${(added.current += 1)}`,
+      exercise: slug,
       name,
       sets: 3,
       repsMin: 10,
@@ -95,27 +132,73 @@ export default function PlanEditor() {
     );
   };
 
-  const finish = () => {
-    savePlanDays(storeKey, days);
-    if (student) {
-      const now = new Date();
-      const total = days.reduce((n, d) => n + d.exercises.length, 0);
-      sendMessage(student.id, {
-        id: `m-${now.getTime()}`,
-        from: 'system',
-        kind: 'workout',
-        title: 'Plano atualizado',
-        detail: `${days.length} treinos · ${total} exercícios · a partir do próximo treino`,
-        time: formatTimeOfDay(now),
-      });
+  const save = async () => {
+    if (!loaded || saving) return;
+    if (days.some((d) => d.exercises.length === 0)) {
+      Alert.alert('Há um treino vazio', 'Cada treino precisa de pelo menos um exercício.');
+      return;
     }
-    haptics.success();
-    router.back();
+    const plan = {
+      name: loaded.name,
+      weeks: loaded.weeks,
+      workoutsPerWeek: loaded.workoutsPerWeek,
+      days: days.map((d) => ({
+        label: d.label,
+        focus: d.focus ?? '',
+        exercises: d.exercises.map((e) => ({
+          exercise: e.exercise,
+          sets: e.sets,
+          repsMin: Math.min(e.repsMin, e.repsMax),
+          repsMax: Math.max(e.repsMin, e.repsMax),
+          restSeconds: e.restSeconds,
+          referenceKg: e.referenceKg ?? null,
+          note: e.note,
+        })),
+      })),
+    };
+    setSaving(true);
+    try {
+      if (student) {
+        const total = days.reduce((n, d) => n + d.exercises.length, 0);
+        await api.put(`/api/v1/trainer/students/${student.id}/plan`, {
+          plan,
+          message: `Atualizei o teu plano: ${days.length} treinos e ${total} exercícios, a partir do próximo treino.`,
+        });
+      } else {
+        await api.put(`/api/v1/trainer/plans/${id}`, plan);
+      }
+      await refresh();
+      haptics.success();
+      router.back();
+    } catch (e) {
+      setSaving(false);
+      Alert.alert('Não foi possível guardar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+    }
   };
 
+  const finish = () => {
+    if (!student && (loaded?.students ?? 0) > 0) {
+      Alert.alert('Guardar o plano?', `A mudança vale para os ${loaded?.students} alunos que seguem este plano, a partir do próximo treino.`, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Guardar', onPress: save },
+      ]);
+      return;
+    }
+    save();
+  };
+
+  if (!loaded || !day) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top + 4, paddingHorizontal: pagePadding, gap: 40 }]}>
+        <IconButton icon="chevronLeft" onPress={() => router.back()} accessibilityLabel="Voltar" />
+        <ActivityIndicator color={colors.volt} />
+      </View>
+    );
+  }
+
   const subject = student
-    ? `Para ${student.name} · ${student.goal}, ${student.weeks} semanas`
-    : `Plano ${plan?.name ?? 'Hipertrofia'} · ${plan?.students ?? 0} alunos`;
+    ? `Para ${student.name} · ${student.goal}, ${loaded.weeks} semanas`
+    : `${loaded.name} · ${loaded.students === 1 ? '1 aluno' : `${loaded.students} alunos`}`;
 
   return (
     <View style={styles.root}>
@@ -132,7 +215,7 @@ export default function PlanEditor() {
         automaticallyAdjustKeyboardInsets
       >
         <Reveal index={0} style={styles.subject}>
-          {student ? <Portrait person={student.id} size={28} /> : <Icon name="plan" size={20} />}
+          {student ? <Avatar photoUri={student.photoUri} size={28} name={student.name} /> : <Icon name="plan" size={20} />}
           <AppText variant="small" tone="muted" style={styles.flex} numberOfLines={1}>
             {subject}
           </AppText>
@@ -184,9 +267,10 @@ export default function PlanEditor() {
         style={[styles.bottom, { paddingBottom: insets.bottom + 10 }]}
       >
         <Button
-          label={student ? `Guardar e enviar ao ${student.firstName}` : 'Guardar plano'}
+          label={saving ? 'A guardar…' : student ? `Guardar e enviar a ${student.firstName}` : 'Guardar plano'}
           height={54}
-          onPress={() => (student ? finish() : setScopeOpen(true))}
+          disabled={saving}
+          onPress={finish}
         />
       </LinearGradient>
 
@@ -197,11 +281,11 @@ export default function PlanEditor() {
         header={<AppText variant="subheading">Adicionar exercício</AppText>}
       >
         <View style={styles.library}>
-          {exerciseLibrary.map((name, i) => (
-            <PressableScale key={name} onPress={() => addExercise(name)} haptic="tick" pressedScale={0.99}>
-              <View style={[styles.libraryRow, i < exerciseLibrary.length - 1 && styles.divider]}>
+          {library.map((item, i) => (
+            <PressableScale key={item.slug} onPress={() => addExercise(item.slug, item.name)} haptic="tick" pressedScale={0.99}>
+              <View style={[styles.libraryRow, i < library.length - 1 && styles.divider]}>
                 <AppText variant="label" style={styles.flex}>
-                  {name}
+                  {item.name}
                 </AppText>
                 <Icon name="plus" size={16} />
               </View>
@@ -210,44 +294,6 @@ export default function PlanEditor() {
         </View>
       </Sheet>
 
-      <Sheet
-        visible={scopeOpen}
-        onClose={() => setScopeOpen(false)}
-        accessibilityLabel="Para quem vale a mudança"
-        header={
-          <View style={styles.sheetHead}>
-            <AppText variant="heading">Para quem vale a mudança?</AppText>
-            <AppText variant="small" tone="muted">
-              Os alunos recebem uma notificação com o plano atualizado.
-            </AppText>
-          </View>
-        }
-      >
-        <View style={styles.scopes}>
-          <OptionCard
-            compact
-            title={`Todos os alunos do plano (${plan?.students ?? 0})`}
-            description="A partir do próximo treino de cada um."
-            selected={scope === 'all'}
-            onPress={() => setScope('all')}
-          />
-          <OptionCard
-            compact
-            title="Só para novos alunos"
-            description="Quem já está no plano continua como estava."
-            selected={scope === 'new'}
-            onPress={() => setScope('new')}
-          />
-        </View>
-        <Button
-          label="Guardar"
-          height={54}
-          onPress={() => {
-            setScopeOpen(false);
-            setTimeout(finish, 240);
-          }}
-        />
-      </Sheet>
     </View>
   );
 }

@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { Pill } from '@/components/Surface';
+import { ApiError } from '@/lib/api';
 import { haptics } from '@/lib/haptics';
+import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
 
 const perks = [
@@ -28,14 +30,24 @@ type PremiumSheetProps = {
 export function PremiumSheet({ visible, onClose, onActivated }: PremiumSheetProps) {
   const [paying, setPaying] = useState(false);
 
-  const confirm = () => {
+  const { buyPremium } = useSettings();
+
+  const confirm = async () => {
     setPaying(true);
-    // Stripe isn't wired yet; simulate the round-trip so the flow can be felt.
-    setTimeout(() => {
+    try {
+      // Stripe Checkout opens in the browser; the server confirms the payment.
+      const active = await buyPremium();
       setPaying(false);
-      haptics.success();
-      onActivated();
-    }, 900);
+      if (active) {
+        haptics.success();
+        onActivated();
+      } else {
+        Alert.alert('Pagamento por concluir', 'Quando o pagamento for confirmado, o Premium fica ativo.');
+      }
+    } catch (e) {
+      setPaying(false);
+      Alert.alert('Não foi possível pagar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+    }
   };
 
   return (
@@ -66,9 +78,9 @@ export function PremiumSheet({ visible, onClose, onActivated }: PremiumSheetProp
 
       <View style={styles.price}>
         <View style={styles.flex}>
-          <AppText variant="label">Cartão terminado em 4242</AppText>
+          <AppText variant="label">Pagamento com cartão (Stripe)</AppText>
           <AppText variant="caption" tone="muted">
-            Cobrado hoje e depois a cada dia 24
+            Cobrado hoje e depois todos os meses neste dia
           </AppText>
         </View>
         <AppText style={styles.amount}>4,99 €/mês</AppText>

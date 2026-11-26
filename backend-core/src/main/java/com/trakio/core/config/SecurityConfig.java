@@ -53,6 +53,8 @@ class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/billing/stripe/webhook").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/trainers", "/api/v1/trainers/*", "/api/v1/trainers/*/reviews").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
+                // Files: a bearer token or a valid signed link (checked in FileController).
+                .requestMatchers(HttpMethod.GET, "/api/v1/files/*").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/v1/trainer/**").hasRole("TRAINER")
                 .requestMatchers("/api/v1/**").authenticated()

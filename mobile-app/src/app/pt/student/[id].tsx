@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,16 +9,16 @@ import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { MuscleMap } from '@/components/MuscleMap';
-import { Portrait } from '@/components/Portrait';
+import { Avatar } from '@/components/Avatar';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { IconButton } from '@/components/Surface';
 import { SectionHeader, StatStrip } from '@/features/pt/components';
-import { students } from '@/features/pt/data';
-import { useTrainer } from '@/features/pt/store';
+import { toStudent, useTrainer } from '@/features/pt/store';
+import { musclesFrom, useStudent } from '@/features/pt/useStudent';
+import { ApiError } from '@/lib/api';
 import { ToolGrid } from '@/features/tools/components';
-import { studentBodies } from '@/features/tools/data';
 import { haptics } from '@/lib/haptics';
 import { layoutGlide } from '@/theme/motion';
 import { colors, fonts, pagePadding } from '@/theme/tokens';
@@ -27,17 +27,52 @@ import { colors, fonts, pagePadding } from '@/theme/tokens';
 export default function StudentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const student = students.find((s) => s.id === id) ?? students[0];
-  const { aiDecisions, decideAi } = useTrainer();
-  const decision = aiDecisions[student.id];
+  const { students, decide, endCoaching } = useTrainer();
+  const { detail, progress, missing, reload, body } = useStudent(id);
+  const [decision, setDecision] = useState<{ kind: string; value: 'applied' | 'ignored' } | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const listed = students.find((s) => s.id === id);
 
-  const stats = student.stats;
-  const body = studentBodies[student.id];
+  if (!detail) {
+    return (
+      <View style={[styles.root, styles.content, { paddingTop: insets.top + 4, gap: 40 }]}>
+        <View style={styles.top}>
+          <IconButton icon="chevronLeft" onPress={() => router.back()} accessibilityLabel="Voltar" />
+        </View>
+        {missing ? (
+          <AppText variant="label" tone="muted" style={styles.centered}>
+            Este aluno já não está a treinar contigo.
+          </AppText>
+        ) : (
+          <ActivityIndicator color={colors.volt} />
+        )}
+      </View>
+    );
+  }
+
+  const student = listed ?? toStudent(detail.student);
+  const suggestion = detail.suggestions[0] ?? null;
+  const shown = suggestion && (!decision || decision.kind === suggestion.kind) ? suggestion : null;
+  const muscles = progress ? musclesFrom(progress) : [];
+  const top = detail.topLift;
   const openTools = () => router.push({ pathname: '/pt/tools', params: { student: student.id } });
-  const openChat = () => router.push({ pathname: '/pt/chat/[id]', params: { id: student.id } });
-  const openPlan = () =>
-    router.push({ pathname: '/pt/plan/[id]', params: { id: student.goal.toLowerCase(), student: student.id } });
+  const openChat = () =>
+    student.conversationId
+      ? router.push({ pathname: '/pt/chat/[id]', params: { id: student.conversationId } })
+      : Alert.alert('Ainda sem conversa', 'A conversa abre quando o pagamento do aluno estiver confirmado.');
+  const openPlan = () => router.push({ pathname: '/pt/plan/[id]', params: { id: 'student', student: student.id } });
+
+  const act = async (value: 'applied' | 'ignored') => {
+    if (!suggestion) return;
+    try {
+      await decide(student.id, suggestion.kind, value, suggestion.kind === 'variation' ? top?.name : undefined);
+      if (value === 'applied') haptics.success();
+      setDecision({ kind: suggestion.kind, value });
+      reload();
+    } catch (e) {
+      Alert.alert('Não foi possível aplicar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -51,14 +86,14 @@ export default function StudentDetail() {
         </View>
 
         <Reveal index={0} style={styles.header}>
-          <Portrait person={student.id} size={60} />
+          <Avatar photoUri={student.photoUri} size={60} name={student.name} />
           <View style={styles.flex}>
             <AppText style={styles.name}>{student.name}</AppText>
             <AppText variant="small" tone="muted">
               {student.goal} · semana {student.week} de {student.weeks}
             </AppText>
             <AppText variant="caption" tone="muted">
-              {student.pack} · {student.price}€/mês
+              {student.pack} · {student.price}€{student.period === 'mês' ? '/mês' : ''}
             </AppText>
           </View>
         </Reveal>
@@ -67,27 +102,31 @@ export default function StudentDetail() {
           <StatStrip
             size={17}
             stats={[
-              { value: stats?.workouts ?? `${student.week - 1} de ${student.week}`, label: 'treinos feitos' },
+              { value: `${detail.workoutsDone} de ${detail.workoutsExpected}`, label: 'treinos · 4 semanas' },
               {
-                value: stats?.maxLoad ?? '—',
-                label: stats?.maxLoadLabel ?? 'carga máxima',
-                extra: stats ? <AppText style={styles.change}>{stats.maxLoadChange}</AppText> : undefined,
+                value: top ? `${Math.round(top.currentMax)} kg` : '—',
+                label: top ? `carga máxima · ${top.name.toLowerCase()}` : 'carga máxima',
+                extra: top ? (
+                  <AppText style={styles.change}>
+                    {top.changePercent > 0 ? '↑' : top.changePercent < 0 ? '↓' : '='} {Math.abs(Math.round(top.changePercent))}%
+                  </AppText>
+                ) : undefined,
               },
-              { value: String(stats?.readiness ?? '—'), label: 'prontidão hoje' },
+              { value: student.readiness === null ? '—' : String(student.readiness), label: 'prontidão hoje' },
             ]}
           />
         </Reveal>
 
-        {student.ai && decision !== 'ignored' ? (
+        {shown && decision?.value !== 'ignored' ? (
           <Animated.View layout={layoutGlide} exiting={FadeOut.duration(180)}>
-            <Reveal index={2} style={[styles.ai, decision === 'applied' && styles.aiDone]}>
-              {decision === 'applied' ? (
+            <Reveal index={2} style={[styles.ai, decision?.value === 'applied' && styles.aiDone]}>
+              {decision?.value === 'applied' ? (
                 <Animated.View entering={FadeIn.duration(260)} style={styles.aiApplied}>
                   <Icon name="checkVolt" size={16} />
                   <View style={styles.flex}>
-                    <AppText style={styles.aiTitle}>{student.ai.action} · feito</AppText>
+                    <AppText style={styles.aiTitle}>{shown.action} · feito</AppText>
                     <AppText variant="small" tone="muted">
-                      {student.firstName} vai receber uma notificação com o plano ajustado.
+                      {shown.kind === 'light-week' ? `O plano de ${student.firstName} foi ajustado e recebeu uma mensagem no chat.` : `${student.firstName} recebeu a mensagem no chat.`}
                     </AppText>
                   </View>
                 </Animated.View>
@@ -98,26 +137,23 @@ export default function StudentDetail() {
                       <AppText style={styles.aiTagText}>IA</AppText>
                     </View>
                     <AppText style={styles.aiTitle} numberOfLines={1}>
-                      {student.ai.title}
+                      {shown.title}
                     </AppText>
                   </View>
                   <AppText variant="small" tone="muted" style={styles.aiBody}>
-                    {student.ai.body}
+                    {shown.body}
                   </AppText>
                   <View style={styles.aiActions}>
                     <PressableScale
                       haptic="press"
-                      onPress={() => {
-                        haptics.success();
-                        decideAi(student.id, 'applied');
-                      }}
+                      onPress={() => act('applied')}
                       style={styles.apply}
                       accessibilityRole="button"
                     >
-                      <AppText style={styles.applyText}>{student.ai.action}</AppText>
+                      <AppText style={styles.applyText}>{shown.action}</AppText>
                     </PressableScale>
                     <PressableScale
-                      onPress={() => decideAi(student.id, 'ignored')}
+                      onPress={() => act('ignored')}
                       style={styles.ignore}
                       accessibilityRole="button"
                     >
@@ -134,7 +170,8 @@ export default function StudentDetail() {
           <Reveal index={3}>
             <MuscleMap
               title="Volume desta semana"
-              note={student.volumeNote ?? 'Arrasta para rodar'}
+              note={muscles.length > 0 ? 'Arrasta para rodar' : 'Sem treinos esta semana'}
+              muscles={muscles}
               height={170}
               accessibilityLabel={`Mapa muscular de ${student.name}`}
             />
@@ -193,10 +230,15 @@ export default function StudentDetail() {
                   {
                     text: 'Terminar',
                     style: 'destructive',
-                    onPress: () => {
+                    onPress: async () => {
                       setMoreOpen(false);
-                      haptics.warning();
-                      router.back();
+                      try {
+                        await endCoaching(student.id);
+                        haptics.warning();
+                        router.back();
+                      } catch (e) {
+                        Alert.alert('Não foi possível terminar', e instanceof ApiError ? e.message : 'Tenta outra vez.');
+                      }
                     },
                   },
                 ],
@@ -211,6 +253,7 @@ export default function StudentDetail() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  centered: { textAlign: 'center' },
   content: { paddingHorizontal: pagePadding, gap: 16 },
   flex: { flex: 1, gap: 3 },
   top: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: -4 },

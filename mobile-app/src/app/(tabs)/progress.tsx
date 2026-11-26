@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -15,10 +15,10 @@ import { decimal } from '@/features/tools/calc';
 import { ToolGrid } from '@/features/tools/components';
 import { useClientBody } from '@/features/tools/useClientBody';
 import { Stepper } from '@/features/workout/components/Stepper';
-import { exerciseLibrary } from '@/features/workout/data';
+import { usePlan } from '@/features/workout/plan';
 import { maxSeries, startOfWeek, useHistory, type Session } from '@/features/workout/history';
 import { haptics } from '@/lib/haptics';
-import { refreshMockData } from '@/lib/refresh';
+import { refreshAll } from '@/lib/refresh';
 import { useClientProfile } from '@/state/auth';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -60,7 +60,7 @@ function liftsIn(sessions: Session[], since: number, now: number): Lift[] {
 }
 
 /** Sets per muscle group this week, for the 3D map tags. */
-function weekMuscles(sessions: Session[], weekStart: number): MuscleTag[] {
+function weekMuscles(sessions: Session[], weekStart: number, exerciseLibrary: { id: string; group: string }[]): MuscleTag[] {
   const sets = new Map<string, number>();
   for (const s of sessions) {
     if (s.finishedAt < weekStart) continue;
@@ -88,7 +88,8 @@ export default function Progress() {
 
   const since = now - rangeDays[range] * DAY;
   const lifts = liftsIn(sessions, since, now);
-  const muscles = weekMuscles(sessions, startOfWeek(new Date(now)));
+  const { exerciseLibrary } = usePlan();
+  const muscles = weekMuscles(sessions, startOfWeek(new Date(now)), exerciseLibrary);
   const weights = entries.filter((e) => e.at >= since);
   const firstWeight = weights[0]?.kg ?? profile.weightKg;
   const lastWeight = entries[entries.length - 1]?.kg ?? profile.weightKg;
@@ -97,7 +98,7 @@ export default function Progress() {
 
   return (
     <>
-      <Screen gap={16} onRefresh={refreshMockData}>
+      <Screen gap={16} onRefresh={refreshAll}>
         <Reveal index={0} style={styles.header}>
           <AppText variant="title">Progresso</AppText>
           <SegmentedControl options={ranges} value={range} onChange={setRange} />
@@ -221,9 +222,13 @@ export default function Progress() {
           <Button
             label="Guardar"
             onPress={async () => {
-              await logWeight(draftKg);
-              haptics.success();
-              setWeighing(false);
+              try {
+                await logWeight(draftKg);
+                haptics.success();
+                setWeighing(false);
+              } catch {
+                Alert.alert('Não foi possível guardar', 'Verifica a ligação e tenta outra vez.');
+              }
             }}
           />
         </View>

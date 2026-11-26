@@ -95,6 +95,15 @@ public class ModerationService {
         return reports.findByStatusOrderByCreatedAtAsc(ReportStatus.OPEN).stream().map(this::view).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<ReportView> resolved() {
+        return reports.findTop50ByStatusOrderByResolvedAtDesc(ReportStatus.RESOLVED).stream().map(this::view).toList();
+    }
+
+    public long resolvedCount() {
+        return reports.countByStatus(ReportStatus.RESOLVED);
+    }
+
     public long openCount() {
         return reports.countByStatus(ReportStatus.OPEN);
     }

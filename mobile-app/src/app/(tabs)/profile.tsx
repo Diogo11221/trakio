@@ -5,7 +5,6 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Icon } from '@/components/Icon';
 import { Avatar } from '@/components/Avatar';
-import { Portrait } from '@/components/Portrait';
 import { PressableScale } from '@/components/PressableScale';
 import { Reveal, Screen } from '@/components/Screen';
 import { Card, CardRow, Pill, SectionLabel } from '@/components/Surface';
@@ -18,14 +17,15 @@ import { goalLabel } from '@/features/tools/data';
 import { useAuth, useClientProfile } from '@/state/auth';
 import { useSettings } from '@/state/settings';
 import { colors, fonts } from '@/theme/tokens';
-import { refreshMockData } from '@/lib/refresh';
+import { refreshAll } from '@/lib/refresh';
+import { DeleteAccountSheet } from '@/features/auth/DeleteAccountSheet';
 
 /** Cliente · Perfil e definições. */
 export default function Profile() {
-  const { vibration, setVibration, lockScreenAlert, setLockScreenAlert, premium, setPremium, restSound, setRestSound } = useSettings();
-  const [sheet, setSheet] = useState<'premium' | 'manage' | null>(null);
+  const { vibration, setVibration, lockScreenAlert, setLockScreenAlert, premium, restSound, setRestSound } = useSettings();
+  const [sheet, setSheet] = useState<'premium' | 'manage' | 'delete' | null>(null);
   const { reset } = useWorkout();
-  const { account, signOut: endSession, deleteAccount } = useAuth();
+  const { account, signOut: endSession } = useAuth();
   const profile = useClientProfile();
   const coached = profile.coached;
   const kg = (v: number) => `${String(v).replace('.', ',')} kg`;
@@ -50,25 +50,13 @@ export default function Profile() {
       'A ligação ao Apple Health (sono, passos, frequência cardíaca) precisa da versão instalada da app — não funciona no Expo Go. Por agora, a prontidão é calculada a partir dos teus treinos.',
     );
 
-  const removeAccount = () =>
-    Alert.alert('Apagar esta conta de teste?', 'O perfil e os dados guardados neste telemóvel são apagados. Não dá para desfazer.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Apagar conta',
-        style: 'destructive',
-        onPress: async () => {
-          reset();
-          await deleteAccount();
-          router.replace('/welcome');
-        },
-      },
-    ]);
+  const removeAccount = () => setSheet('delete');
 
   return (
     <>
-      <Screen gap={14} onRefresh={refreshMockData}>
+      <Screen gap={14} onRefresh={refreshAll}>
         <Reveal index={0} style={styles.header}>
-          <Avatar photoUri={profile.photoUri} demoPerson={profile.demoPerson} size={56} name={profile.name} />
+          <Avatar photoUri={profile.photoUri} size={56} name={profile.name} />
           <View style={styles.headerText}>
             <AppText variant="heading">{profile.name}</AppText>
             <View style={styles.pills}>
@@ -106,7 +94,7 @@ export default function Profile() {
           {coached && profile.trainer ? (
             <Card radius={16}>
               <CardRow style={styles.ptRow}>
-                <Portrait person={profile.trainer.id} size={36} />
+                <Avatar photoUri={profile.trainer.photoUri} size={36} name={profile.trainer.name} />
                 <View style={styles.flex}>
                   <AppText style={styles.ptName}>{profile.trainer.name}</AppText>
                   <AppText variant="caption" tone="muted">
@@ -181,7 +169,7 @@ export default function Profile() {
             />
             <SettingRow label="Email" value={account?.email ?? '—'} />
             <SettingRow label="Idioma" value="Português (PT)" />
-            <SettingRow label="Apagar conta de teste" onPress={removeAccount} last />
+            <SettingRow label="Apagar conta" onPress={removeAccount} last />
           </Card>
         </Reveal>
 
@@ -203,19 +191,14 @@ export default function Profile() {
       <PremiumSheet
         visible={sheet === 'premium'}
         onClose={() => setSheet(null)}
-        onActivated={() => {
-          setPremium(true);
-          setSheet(null);
-        }}
+        onActivated={() => setSheet(null)}
       />
       <ManageSubscriptionSheet
         visible={sheet === 'manage'}
         onClose={() => setSheet(null)}
-        onCancelled={() => {
-          setPremium(false);
-          setSheet(null);
-        }}
+        onCancelled={() => setSheet(null)}
       />
+      <DeleteAccountSheet visible={sheet === 'delete'} onClose={() => setSheet(null)} onDeleted={reset} />
     </>
   );
 }

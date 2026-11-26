@@ -1,4 +1,3 @@
-import type { Person } from '@/components/Portrait';
 import type { ClientProfile } from '@/features/auth/types';
 import { formatThousands } from '@/lib/format';
 
@@ -75,7 +74,7 @@ export type BodyData = {
   lift: { exercise: string; weightKg: number; reps: number };
 };
 
-/** The signed-in client (Miguel) — mock until backend-core has a profile API. */
+/** Neutral starting values while a student's data loads (every field is editable). */
 export const clientBody: BodyData = {
   sex: 'male',
   age: 29,
@@ -90,88 +89,6 @@ export const clientBody: BodyData = {
   lift: { exercise: 'Supino plano', weightKg: 85, reps: 6 },
 };
 
-/** Last measurements the PT recorded for each student. */
-export const studentBodies: Partial<Record<Person, BodyData>> = {
-  miguel: clientBody,
-  ana: {
-    sex: 'female',
-    age: 34,
-    weightKg: 64,
-    heightCm: 165,
-    waistCm: 74,
-    neckCm: 32,
-    hipCm: 99,
-    activity: 'light',
-    goal: 'lose',
-    trainingMinutes: 45,
-    lift: { exercise: 'Agachamento', weightKg: 50, reps: 8 },
-  },
-  joao: {
-    sex: 'male',
-    age: 41,
-    weightKg: 91.5,
-    heightCm: 182,
-    waistCm: 97,
-    neckCm: 41,
-    hipCm: 104,
-    activity: 'moderate',
-    goal: 'maintain',
-    trainingMinutes: 75,
-    lift: { exercise: 'Peso morto', weightKg: 140, reps: 5 },
-  },
-  carla: {
-    sex: 'female',
-    age: 52,
-    weightKg: 68,
-    heightCm: 162,
-    waistCm: 82,
-    neckCm: 33,
-    hipCm: 102,
-    activity: 'light',
-    goal: 'maintain',
-    trainingMinutes: 40,
-    lift: { exercise: 'Leg press', weightKg: 70, reps: 10 },
-  },
-  pedro: {
-    sex: 'male',
-    age: 37,
-    weightKg: 84,
-    heightCm: 176,
-    waistCm: 92,
-    neckCm: 39,
-    hipCm: 101,
-    activity: 'light',
-    goal: 'maintain',
-    trainingMinutes: 40,
-    lift: { exercise: 'Remada sentado', weightKg: 55, reps: 10 },
-  },
-  sofia: {
-    sex: 'female',
-    age: 26,
-    weightKg: 58,
-    heightCm: 168,
-    waistCm: 66,
-    neckCm: 31,
-    hipCm: 94,
-    activity: 'moderate',
-    goal: 'gain',
-    trainingMinutes: 60,
-    lift: { exercise: 'Hip thrust', weightKg: 80, reps: 8 },
-  },
-  tomas: {
-    sex: 'male',
-    age: 23,
-    weightKg: 72,
-    heightCm: 181,
-    waistCm: 78,
-    neckCm: 37,
-    hipCm: 92,
-    activity: 'high',
-    goal: 'gain',
-    trainingMinutes: 75,
-    lift: { exercise: 'Agachamento', weightKg: 100, reps: 5 },
-  },
-};
 
 /** Short live value shown on each tool tile, e.g. "24,7". */
 export function toolPreview(tool: ToolId, body: BodyData): { value: string; unit: string; note: string } {

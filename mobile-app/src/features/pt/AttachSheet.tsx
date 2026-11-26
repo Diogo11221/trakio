@@ -9,39 +9,27 @@ import { PressableScale } from '@/components/PressableScale';
 import { Sheet } from '@/components/Sheet';
 import { colors, fonts } from '@/theme/tokens';
 
-export type Attachment =
-  | { kind: 'photo'; uri: string }
-  | { kind: 'file'; name: string; meta: string }
-  | { kind: 'workout'; title: string; detail: string };
+export type Attachment = { kind: 'photo'; uri: string } | { kind: 'file'; uri: string; name: string; mimeType: string };
 
-export type AttachSource = 'camera' | 'photos' | 'file' | 'workout';
+export type AttachSource = 'camera' | 'photos' | 'file';
 
 type AttachSheetProps = {
   visible: boolean;
   onClose: () => void;
   onAttach: (attachment: Attachment) => void;
-  /** Which options to offer (students can't send workout cards). */
+  /** Which options to offer. */
   sources?: AttachSource[];
 };
-
-function sizeLabel(bytes: number | undefined): string {
-  if (!bytes) return '';
-  return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${Math.round(bytes / 1024)} KB`;
-}
 
 /** PT · Mensagens · anexar — camera, photos, file or a workout card. */
 export function AttachSheet({ visible, onClose, onAttach, sources }: AttachSheetProps) {
   const pick = async (source: AttachSource) => {
-    if (source === 'workout') {
-      onAttach({ kind: 'workout', title: 'Treino B · Costas', detail: '6 exercícios · ~50 min · toca para abrir' });
-      return;
-    }
     if (source === 'file') {
-      const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: false });
+      // Copied to the cache so the upload can read it.
+      const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/jpeg', 'image/png'], copyToCacheDirectory: true });
       if (result.canceled) return;
       const file = result.assets[0];
-      const type = file.mimeType?.includes('pdf') ? 'PDF' : 'Imagem';
-      onAttach({ kind: 'file', name: file.name, meta: [type, sizeLabel(file.size)].filter(Boolean).join(' · ') });
+      onAttach({ kind: 'file', uri: file.uri, name: file.name, mimeType: file.mimeType ?? 'application/pdf' });
       return;
     }
     if (source === 'camera') {
@@ -59,7 +47,6 @@ export function AttachSheet({ visible, onClose, onAttach, sources }: AttachSheet
     { id: 'camera', label: 'Câmara', icon: 'attachCamera' },
     { id: 'photos', label: 'Fotografias', icon: 'attachPhotos' },
     { id: 'file', label: 'Ficheiro', icon: 'attachFile' },
-    { id: 'workout', label: 'Treino', icon: 'attachWorkout' },
   ];
 
   return (
@@ -89,7 +76,7 @@ export function AttachSheet({ visible, onClose, onAttach, sources }: AttachSheet
         ))}
       </View>
       <AppText variant="caption" tone="muted" style={styles.note}>
-        Fotos, vídeos curtos e PDF até 25 MB. O aluno recebe uma notificação.
+        Fotos (JPEG ou PNG) e PDF até 10 MB.
       </AppText>
       <Button label="Cancelar" variant="outline" height={50} onPress={onClose} />
     </Sheet>
